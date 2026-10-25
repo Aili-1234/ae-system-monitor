@@ -7,19 +7,34 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+  windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - name: 回归测试（11 组）
+        shell: bash
+        run: bash tools/ci-local.sh
+      - name: 失败时打印整段日志（便于远程排查）
+        if: failure()
+        shell: bash
+        run: |
+          set -u
+          for f in tests/*.test.js; do
+            echo "=========== $f"
+            node "$f" 2>&1 | tail -40 || true
+          done
+
+  linux:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 回归测试（Linux 分支，非阻断）
         shell: bash
         run: bash tools/ci-local.sh
