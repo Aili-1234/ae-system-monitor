@@ -8,7 +8,11 @@ on:
 
 jobs:
   test:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -16,17 +20,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: 语法检查
-        shell: bash
-        run: |
-          for f in js/*.js tests/*.js; do node --check "$f"; done
-
       - name: 回归测试（11 组）
         shell: bash
-        run: |
-          fail=0
-          for f in tests/*.test.js; do
-            echo "--- $f"
-            node "$f" || fail=1
-          done
-          exit $fail
+        run: bash tools/ci-local.sh
