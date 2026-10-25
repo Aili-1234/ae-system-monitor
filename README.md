@@ -1,5 +1,9 @@
 # AE System Monitor
 
+[![tests](https://github.com/Aili-1234/ae-system-monitor/actions/workflows/tests.yml/badge.svg)](https://github.com/Aili-1234/ae-system-monitor/actions/workflows/tests.yml)
+[![release](https://img.shields.io/github/v/release/Aili-1234/ae-system-monitor)](https://github.com/Aili-1234/ae-system-monitor/releases)
+[![license](https://img.shields.io/github/license/Aili-1234/ae-system-monitor)](LICENSE)
+
 **一个塞进 After Effects 的磁盘缓存监控面板。** 它只回答三个问题：缓存配额还够不够、照现在的增速几天后撞线、撞线前能不能先替你存一次盘。
 
 不是独立软件——CEP 扩展，装完出现在 AE 的 `窗口 > 扩展 > System Monitor`，随 AE 开关。
