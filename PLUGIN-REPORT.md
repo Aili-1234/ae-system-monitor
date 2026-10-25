@@ -6,7 +6,7 @@
 | 类型 | Adobe CEP 扩展（停靠面板，内置在 AE 内） |
 | 版本 | 1.5.0 |
 | Bundle ID | `com.sysmon.ae.panel` |
-| 宿主 | After Effects CC 2017 (14.0) ~ 2026+（manifest：`AEFT [14.0,99.9]` + `CSXS 7.0`） |
+| 宿主 | After Effects CC 2018 (15.0) ~ 2026+（manifest：`AEFT [15.0,99.9]` + `CSXS 7.0`） |
 | 运行环境 | Windows（磁盘优先 `fs.statfsSync`，降级 PowerShell CIM；macOS 走 `statfs`/`df`） |
 | 安装位置 | `%APPDATA%\Adobe\CEP\extensions\AESystemMonitor` |
 | 实测环境 | Windows / AE 24.2 / Node 22（面板侧） |
@@ -461,7 +461,7 @@ for f in tests/*.test.js; do node "$f" | tail -2; done
 | AE 版本 | CEP | CEP 内置 Node | 状态 | 依据 |
 |---|---|---|---|---|
 | CC 2015.3 (13.8) | 6.1 | 6 | 理论可用 | 需 CEP 6.1+ 才有 `--enable-nodejs` |
-| **CC 2017 (14.0)** | 7 | 6 / 8 | 声明支持（manifest 下限） | 降级路径已覆盖 |
+| ~~CC 2017 (14.0)~~ | 7 | 6 / 8 | **1.5.0 起不再支持**（manifest 下限已提到 15.0，CC 2017 面板不加载） | 降级路径代码仍在，但 CEP 根本不会加载插件 |
 | CC 2018 (15.0) | 8 | 8 | 声明支持 | 无 `fs.promises`、无 `withFileTypes`，已模拟测试 |
 | CC 2019 (16.0) | 9 | 8 / 9 | 声明支持 | 同上 |
 | 2020 (17.x) | 10 | 10 | 声明支持 | `dirty` 从 17.5 起可用 |
@@ -469,7 +469,7 @@ for f in tests/*.test.js; do node "$f" | tail -2; done
 | **2024 (24.2)** | 11 | 18 | **已实测** | 全部功能实机跑通 |
 | 2025+ (25.x) | 12 | ≥ 18 | 声明支持 | Host 上限 99.9 |
 
-manifest 声明：`AEFT [14.0, 99.9]` + `CSXS 7.0`。安装脚本写 `CSXS.6 ~ CSXS.12` 的 `PlayerDebugMode`。
+manifest 声明：`AEFT [15.0, 99.9]` + `CSXS 7.0`。安装脚本写 `CSXS.6 ~ CSXS.12` 的 `PlayerDebugMode`。
 
 ### 6.2 为兼容做的四处改造
 
@@ -858,7 +858,7 @@ node tests/wiring.test.js
 | 事项 | 现状 |
 |---|---|
 | 版本 | 1.5.0（只在 `CSXS/manifest.xml` 的 `ExtensionBundleVersion`；面板界面不显示版本） |
-| 源码 | `<工作区>/AESystemMonitor/`，10 个运行文件 + 11 个测试文件，5867 行 |
+| 源码 | `<工作区>/AESystemMonitor/`，11 个运行文件 + 17 个测试文件（测试 2517 行） |
 | 已部署 | 是。已复制到 `%APPDATA%\Adobe\CEP\extensions\AESystemMonitor`，10 文件、SHA256 与源码 0 差异 |
 | 测试 | 17 组 660 项全过；本机与无 AE 环境数字一致（命令见 [7.4](#74-一条命令复跑)） |
 | 面板入口 | `index.html` → `js/main.js` 的 `init()` |
@@ -1092,7 +1092,7 @@ Copy-Item index.html -Destination $d -Force
 | 增速点数上限 / 平稳阈值 | 480 点 / 0.01 GB/h | `js/trend.js:34-36` |
 | 提醒默认 | 喝水 45、起身 60、远眺 40、内存播报 30（关）、内存偏高 90%/3 次/15 min |  `js/settings.js:33-39`|
 | 提醒可填范围 | 5–240 min；阈值 50–99%；次数 1–30；冷却 1–180 |  `js/settings.js:56-64`|
-| 宿主 / CEP 下限 | `AEFT [14.0, 99.9]` / `CSXS 7.0` | `CSXS/manifest.xml` |
+| 宿主 / CEP 下限 | `AEFT [15.0, 99.9]` / `CSXS 7.0` | `CSXS/manifest.xml` |
 | 提交内存三档 | 92% / 80% / 70%（权重 45/28/12） | `js/guard.js` 的 `W` 与 `COMMIT_*` |
 | 物理内存三档 | 92% / 85% / 75%（权重 20/12/6） | 同上（v2 降权） |
 | 崩溃史窗口 | 近 6 小时 22 分 / 近 24 小时 12 分 | `js/guard.js` 的 `CRASH_HOT_H` / `CRASH_DAY_H` |
