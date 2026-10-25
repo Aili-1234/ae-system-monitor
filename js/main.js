@@ -196,16 +196,25 @@
     return '…\\' + parts.slice(-2).join('\\');
   }
 
-  function toast(msg) {
+  function toast(msg, action) {
     var t = document.createElement('div');
     t.className = 'toast';
-    t.textContent = msg;
+    var message = document.createElement('span');
+    message.textContent = msg;
+    t.appendChild(message);
+    if (action && action.label && typeof action.run === 'function') {
+      var btn = document.createElement('button');
+      btn.className = 'toast-action';
+      btn.textContent = action.label;
+      btn.onclick = function () { action.run(); if (t.parentNode) t.parentNode.removeChild(t); };
+      t.appendChild(btn);
+    }
     document.body.appendChild(t);
     requestAnimationFrame(function () { t.classList.add('show'); });
     setTimeout(function () {
       t.classList.remove('show');
       setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 260);
-    }, 1700);
+    }, action ? 5000 : 2600);
   }
 
   /* ---------------- 磁盘查询 ---------------- */
@@ -1028,14 +1037,16 @@
         // 立即把本地状态改成「干净」，否则下一轮可能用旧读数再次触发
         ST.proj.d = (o.d === 1 || o.d === 0) ? o.d : 0;
         if (o.r) ST.proj.rev = o.r;
-        toast('已自动保存工程' + (why === 'risk' ? '（风险升高）' : '（改动已积压）'));
+        toast('已自动保存工程' + (why === 'risk' ? '（风险升高）' : '（改动已积压）') +
+          (ST.guard.backupErr ? ' · 本次未留回退副本：' + ST.guard.backupErr : ''),
+          ST.guard.lastBackup ? { label: '取回上一版', run: restoreLatest } : null);
         renderAE();
         logSave(true, why, ST.guard.saveMs, '', ST.projectPath);
       } else {
         grd.markFailed(now);                        // 记时间，避免每轮重试卡界面
         ST.guard.lastErr = (o && o.err) || '未收到 AE 响应';
         ST.guard.saveMs = now - started;
-        toast('自动保存失败：' + ST.guard.lastErr);
+        toast('自动保存失败：' + ST.guard.lastErr + ' · 请尝试手动 Ctrl/Cmd+S 保存');
         logSave(false, why, ST.guard.saveMs, ST.guard.lastErr, ST.projectPath);
       }
       renderGuard();
@@ -1090,13 +1101,20 @@
     return !!(Backup && USR && USR.crashGuard && USR.crashGuard.backup);
   }
 
-  function backupRoot() {
+  function backupRoot(projectPath) {
+    // 优先放在工程所在卷，避免大工程备份挤满系统盘；路径不可用时回退到本机目录。
+    if (projectPath && hasNode && pathmod) {
+      try {
+        var parent = pathmod.dirname(projectPath);
+        if (fs.existsSync(parent)) return pathmod.join(parent, '.ae-system-monitor-backups');
+      } catch (e) {}
+    }
     var dir = localDataDir();
     return dir ? pathmod.join(dir, 'backup') : '';
   }
 
   function backupDirFor(projectPath) {
-    var root = backupRoot();
+    var root = backupRoot(projectPath);
     if (!root || !Backup || !projectPath) return '';
     return pathmod.join(root, Backup.folderFor(projectPath));
   }
@@ -1143,6 +1161,11 @@
 
       var dest = pathmod.join(dir, Backup.backupName(projectPath, Date.now()));
       fs.copyFileSync(projectPath, dest);
+      // 再次核验字节数，避免不完整副本被标成可回退版本。
+      if (fs.statSync(dest).size !== fs.statSync(projectPath).size) {
+        try { fs.unlinkSync(dest); } catch (ignore) {}
+        return { ok: false, err: '副本大小校验未通过' };
+      }
 
       // 轮转：只留最近 keep 份
       var keepN = (USR.crashGuard && USR.crashGuard.keepBackups) || 5;
@@ -1164,7 +1187,7 @@
     if (!list.length) { toast('还没有回退副本（下次保护保存时生成）'); return; }
 
     var dir = pathmod.dirname(ST.projectPath);
-    var dest = pathmod.join(dir, Backup.restoreName(ST.projectPath, Date.now()));
+    var dest = pathmod.join(dir, Backup.restoreName(ST.projectPath, list[0].mtime));
     try {
       if (fs.existsSync(dest)) { toast('同名回退副本已存在，稍后再试'); return; }
       fs.copyFileSync(list[0].path, dest);

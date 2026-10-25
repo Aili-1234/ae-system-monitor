@@ -93,8 +93,8 @@ console.log('\n[9] manifest 允许折叠成窄条 / 版本覆盖');
 ok('MinSize 宽度 <= 120', /<Width>(\d+)<\/Width>/.test(manifest) &&
    (() => { const m = [...manifest.matchAll(/<Width>(\d+)<\/Width>/g)]; const min = Math.min(...m.map(x => +x[1])); return min <= 120; })());
 ok('仍开启 --enable-nodejs', manifest.indexOf('--enable-nodejs') >= 0);
-ok('Host 下探到 AE CC 2017 (14.0)', /Version="\[14\.0,99\.9\]"/.test(manifest));
-ok('Host 上限为 99.9（覆盖未来版本）', /Version="\[14\.0,99\.9\]"/.test(manifest));
+ok('Host 下探到 AE CC 2018 (15.0)', /Version="\[15\.0,99\.9\]"/.test(manifest));
+ok('Host 上限为 99.9（覆盖未来版本）', /Version="\[15\.0,99\.9\]"/.test(manifest));
 ok('RequiredRuntime 降到 CEP 7', /<RequiredRuntime Name="CSXS" Version="7\.0"/.test(manifest));
 
 console.log('\n[9b] 安装脚本覆盖旧版 CEP 的调试开关');
