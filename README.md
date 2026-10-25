@@ -33,13 +33,13 @@
 
 ### 方式一：双击安装（Windows）
 
-下载 [Releases](../../releases) 里的 zip，解压后双击 `install.bat`，然后**完全退出 AE 再重开**。
+下载 [Releases](https://github.com/Aili-1234/ae-system-monitor/releases) 里的 zip，解压后双击 `install.bat`，然后**完全退出 AE 再重开**。
 
 ### 方式二：git clone 到扩展目录（可 `git pull` 更新）
 
 ```bat
 cd "%APPDATA%\Adobe\CEP\extensions"
-git clone https://github.com/<你的用户名>/ae-system-monitor.git AESystemMonitor
+git clone https://github.com/Aili-1234/ae-system-monitor.git AESystemMonitor
 ```
 
 然后注册表 `HKEY_CURRENT_USER\Software\Adobe\CSXS.11` 新建字符串 `PlayerDebugMode` = `1`（不确定 CEP 版本就把 `CSXS.6`~`CSXS.12` 都写一遍）。重开 AE。
