@@ -10,6 +10,11 @@
 - **测试不再依赖本机装没装 AE**：`scan` / `compat` / `autosave` / `umd` / `optimize` 五组改为 fixture 驱动。此前在 CI runner 上会 598 通过 + 1 失败 + 3 组退出（`scan` 直接 `exit=1`），本机却全绿 —— 这类"绿得不一样"比红更危险。
 - 附带 `tests/_no-ae-sim.js`：预加载垫片把 `os.homedir()` 指到空目录，可随时复现"没装 AE 的机器"。
 - 测试 **17 组 660 项**，本机与无 AE 环境跑出**完全相同的数字**。
+- **修安装脚本换行**：`install.bat` / `uninstall.bat` 在工作区里是 LF，
+  而 `cmd.exe` 解析 LF-only 的批处理会串行（报"命令语法不正确"、`Installer` 被拆成 `taller`）。
+  测试不执行 `.bat`，所以这条测试全绿也照错。已全部转 CRLF；
+  仓库的 `.gitattributes` 早已声明 `*.bat text eol=crlf`（克隆正常），
+  但 GitHub「Download ZIP」不做 eol 转换 —— 分发请用预打包的安装 zip。
 
 ## 1.4.3 — 2026-10-25
 
