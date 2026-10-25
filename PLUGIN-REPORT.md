@@ -10,9 +10,9 @@
 | 运行环境 | Windows（磁盘优先 `fs.statfsSync`，降级 PowerShell CIM；macOS 走 `statfs`/`df`） |
 | 安装位置 | `%APPDATA%\Adobe\CEP\extensions\AESystemMonitor` |
 | 实测环境 | Windows / AE 24.2 / Node 22（面板侧） |
-| 测试规模 | 17 组、**655 项**断言，全绿（`node tests/*.test.js` 逐组复跑） |
+| 测试规模 | 17 组、**660 项**断言；本机与"无 AE 环境"跑出**完全相同的数字**（`node tests/*.test.js`） |
 | 交付状态 | 已安装，安装副本与源码 11 个文件逐字节一致 |
-| 报告日期 | 2026-10-25（v9，1.4.4：回退副本、保存位置可见；本版按实测把版本与测试数统一校正） |
+| 报告日期 | 2026-10-25（v10，1.4.4：回退副本、保存位置可见、测试改 fixture 驱动；已推送 GitHub） |
 
 ---
 
@@ -240,7 +240,7 @@ for f in tests/*.test.js; do node "$f" | tail -2; done
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-模块职责的分界线很硬：**纯逻辑模块不碰 DOM、不碰文件系统**，所以 `ae-cache.js`、`settings.js`、`reminder.js`、`guard.js`、`trend.js` 都能在 Node 里直接跑断言；`main.js` 只做展示与调度。这条分界线是 655 项断言能存在的前提——五个纯逻辑模块（`settings` / `reminder` / `guard` / `trend` / `ae-cache`）就占了 208 项（176 + 扫描 12 + 兼容 21），全部注入假时间、假 fs 与假数据，不需要真的开着 AE。
+模块职责的分界线很硬：**纯逻辑模块不碰 DOM、不碰文件系统**，所以 `ae-cache.js`、`settings.js`、`reminder.js`、`guard.js`、`trend.js` 都能在 Node 里直接跑断言；`main.js` 只做展示与调度。这条分界线是 660 项断言能存在的前提——五个纯逻辑模块（`settings` / `reminder` / `guard` / `trend` / `ae-cache`）就占了 208 项（176 + 扫描 12 + 兼容 21），全部注入假时间、假 fs 与假数据，不需要真的开着 AE。
 
 ---
 
@@ -499,28 +499,28 @@ manifest 声明：`AEFT [14.0, 99.9]` + `CSXS 7.0`。安装脚本写 `CSXS.6 ~ C
 
 ### 7.1 总表
 
-17 组、**655 项**断言，全部通过。
+17 组、**660 项**断言，全部通过；换一台没装 AE 的机器跑，数字不变。
 
 | 测试 | 项数 | 覆盖什么 |
 |---|---:|---|
 | `umd.test.js` | 11 | 模块在 CEP / 浏览器 / Node 三种环境下都能被取到，且 CEP 分支真能读到偏好 |
-| `scan.test.js` | 11 | 扫描结果与独立递归实现逐字节比对（不硬编码）；**读本机真实 AE 偏好**，无 AE 时整组跳过且 exit=1（见 7.5） |
+| `scan.test.js` | 12 | 扫描结果与独立递归实现逐字节比对（fixture 缓存树，不硬编码、不依赖本机） |
 | `settings.test.js` | 37 | 脏数据归一化、数值裁剪、自定义分钟不被吸附 |
 | `reminder.test.js` | 50 | 间隔边界、关闭再开启、稍后提醒、阈值连续判定、冷却、**渲染静音不补响** |
 | `guard.test.js` | 50 | 风险分级、两种触发、冷却、渲染跳过、写盘风暴防护 |
 | `guard-crash.test.js` | 41 | **提交内存信号、崩溃史→不稳定期**、有效阈值的下限保护 |
 | `trend.test.js` | 40 | 增速估算、窗口裁剪、缓存回落、样本不足不给结论、ETA 格式化 |
 | `trend-margin.test.js` | 41 | **双字段采样**：ETA 用余量斜率、缓存斜率只解释成因、老样本退回旧算法 |
-| `autosave.test.js` | 15 | 解析 AE 自带自动保存配置、中文路径解码、最新 .aep 定位；**依赖本机 AE**，无 AE 时整组 SKIP（7.5） |
+| `autosave.test.js` | 19 | 解析 AE 自带自动保存配置、中文路径解码、最新 .aep 定位（fixture 偏好文件） |
 | `hostjsx.test.js` | 39 | **用假 AE 对象真跑 ExtendScript**，验证属性名与降级 |
-| `compat.test.js` | 21 | 四种老版本 Node 环境下的读取与扫描一致性；**依赖本机 AE**，无 AE 时整组 SKIP（7.5） |
+| `compat.test.js` | 21 | 四种老版本 Node 环境下的读取与扫描一致性（fixture 缓存树） |
 | `prefs-version.test.js` | 32 | **偏好按运行版本对齐**：精确/降级/全局三级回退、缓存目录 strict 定位 |
 | `crash-history.test.js` | 40 | 从 WER 读崩溃史：UTF-16LE 解码、异常代码翻译、次数与中位间隔、脾气分档 |
 | `guard-modes.test.js` | 46 | **四个档位**：自动推荐规则、预设数值、按档位的崩溃窗口、安静档不进不稳定期 |
 | `wiring.test.js` | 94 | ID 接线、脚本顺序、label 指向、manifest 声明、声音是否彻底移除 |
 | `optimize.test.js` | 57 | 上限与日志开关进 schema、其他版本缓存枚举、降频/降级路径未被退回 |
 | `backup.test.js` | 30 | **回退副本**：命名/哈希分夹/轮转保留份数/挑最新，覆盖优先语义 |
-| **合计** | **655** | |
+| **合计** | **660** | |
 
 ### 7.2 三类特别值得说的测试
 
@@ -560,34 +560,33 @@ ExtendScript 里属性名打错（`dirty` 写成 `isDirty`）不会报语法错�
 for f in tests/*.test.js; do printf '%-28s' "$f"; node "$f" | tail -1; done
 ```
 
-期望逐项通过数（17 组、合计 **655**，失败数一律为 0）：
+期望逐项通过数（17 组、合计 **660**，失败数一律为 0）：
 
 ```
-umd 11       scan 11          settings 37      reminder 50
+umd 11       scan 12          settings 37      reminder 50
 guard 50     guard-crash 41   guard-modes 46   trend 40
-trend-margin 41   autosave 15  hostjsx 39       compat 21
+trend-margin 41   autosave 19  hostjsx 39       compat 21
 prefs-version 32  crash-history 40   backup 30   wiring 94
 optimize 57
 ```
 
-**这条不能写成"已全部 fixture 驱动"。** GitHub 仓库那条线（`ae-system-monitor/`，12 组 429 项）做了 fixture 化，用的是 `tests/_fixture.js`（临时目录里造 `设置.txt`、`*-indep-general.txt`、自动保存目录与缓存树，并把 `os.homedir()` / `os.hostname()` 指过去）；但**本机这条 17 组 655 项的线没有移植**，`scan` / `compat` / `autosave` / `umd` / `optimize` 五组仍读本机真实 AE。实测差距见 [7.5](#75-哪些测试依赖本机真实-ae实测)，这是当前最大的 CI 风险。
+**这条曾经不成立，1.4.4 才成立。** 早先 `scan` / `compat` / `autosave` / `umd` / `optimize` 五组直接读本机真实 AE 偏好，于是「本机全绿、CI 红」同时成立。1.4.4 复用 `tests/_fixture.js`（临时目录里造 `设置.txt`、`*-indep-general.txt`、自动保存目录与缓存树，把 `os.homedir()` / `os.hostname()` 指过去，Windows 与 mac 两种偏好位置都写）把这五组改成 fixture 驱动。修复前后的实测对比见 [7.5](#75-测试与装没装-ae的关系144-已修)。
 
 一条命令跑全量（含失败即非零退出）用 `bash tools/ci-local.sh`；GitHub Actions 上 Windows 是硬门禁、Linux 分支跑但不阻断。
 
-### 7.5 哪些测试依赖本机真实 AE（实测）
+### 7.5 测试与「装没装 AE」的关系（1.4.4 已修）
 
-用一个预加载垫片把 `os.homedir()` 指到空目录，模拟"没装 AE 的机器"——
-CI runner 就是这个环境。（**注意**：改 `APPDATA` 环境变量没用，`prefsRoot()` 读的是 `os.homedir()`。）
+`ae-cache.js` 的 `prefsRoot()` 读的是 `os.homedir()`，**改 `APPDATA` 环境变量没用**。
+要复现"没装 AE 的机器"（CI runner 就是这样），得把 `homedir` 指到空目录 —— 工具是 `tests/_no-ae-sim.js`：
 
 ```bash
-node -r ./tests/_no-ae-sim.js tests/scan.test.js
-# 全部组一起看：
-for f in tests/*.test.js; do node -r ./tests/_no-ae-sim.js "$f"; done
+node -r ./tests/_no-ae-sim.js tests/scan.test.js      # 单组
+for f in tests/*.test.js; do node -r ./tests/_no-ae-sim.js "$f"; done   # 全部
 ```
 
-2026-10-25 实测（17 组 655 项）：
+**修复前（1.4.3，留着当教训）**
 
-| 组 | 正常 | 无 AE 时 | 表现 |
+| 组 | 有 AE | 无 AE | 表现 |
 |---|---:|---:|---|
 | `scan.test.js` | 11 | 0 | 打印「未读到偏好，跳过」，**exit=1** → CI 直接红 |
 | `compat.test.js` | 21 | 0 | 整组 SKIP |
@@ -597,14 +596,17 @@ for f in tests/*.test.js; do node -r ./tests/_no-ae-sim.js "$f"; done
 | 其余 12 组 | 591 | 591 | 不受影响 |
 | **合计** | **655** | **598 通过 + 1 失败** | 少 56 条、多 1 条失败 |
 
-**结论**：「655 在任何机器上一致」这句话**现在是不成立的**。本机全绿，runner 上会是 598 + 1 失败 + 3 组退出。
+也就是说：**「本机全绿」和「CI 红」曾经同时成立**。
 
-**怎么修**：仓库那条线已有 `tests/_fixture.js`（造假偏好、假 `*-indep-general.txt`、假缓存树，
-并把 `os.homedir()` / `os.hostname()` 指过去，同时写 Windows 与 mac 两种偏好位置），
-直接移植过来，把这五组改成 fixture 驱动即可。工作量主要在 `umd` 与 `optimize` 的断言改写。
-已列为 [13.5](#135-待办清单提过但没做不是遗漏) 的 P0。
+**1.4.4 的改法**：这五组改成 fixture 驱动，复用 `tests/_fixture.js`（造 `设置.txt`、`*-indep-general.txt`、
+自动保存目录、缓存树，把 `os.homedir()` / `os.hostname()` 指过去，Windows 与 mac 两种偏好位置都写）。
+`optimize` 那 6 条额外造了**第二套版本的缓存目录**，用来验证 `otherVersionCacheDirs` 真的把"别的版本"枚举出来。
 
----
+**修复后**：本机 660 / 无 AE 660，**逐组数字完全一致，零空跑组**。
+
+> 为什么值得单独记一笔：CI 是硬门禁（两个平台任一失败即拦住），但**"少测"拦不住** ——
+> 只有"数量对不上"才会被发现。所以验证可移植性的正确方法不是"看 CI 绿不绿"，
+> 而是**在两个环境各跑一遍，比对逐组数字**。
 
 ## 八、已知边界
 
@@ -694,7 +696,7 @@ node tests/wiring.test.js
 | **1.4.1** | **修两个静默错误**：① 偏好文件永远读最高版本（开 AE 2023 会显示 24.2 的配额与目录）→ 改为按运行版本三级回退 + 界面标注来源；② 趋势 ETA 单位错配（缓存增速除余量）→ 采样改双字段，ETA 用余量斜率、缓存斜率只解释成因，老样本自动退回旧算法。**判定模型 v2**：内存侧主信号换成**提交内存**（依据 `Unable to allocate` 是分配失败，非物理占用），物理占用率降权；新增**崩溃史→不稳定期**（读 WER，含 UTF-16LE 解码与异常代码翻译），积压上限减半、风险阈值下调 15。新增 4 组测试，564 项全绿 |
 | **1.4.2** | **崩溃判定按本机脾气定标**：新增四个档位（稳定 / 偶发 / 高频 / 安静），每档带自己的崩溃窗口与「最多攒 / 阈值」；**装好后自动读 WER 崩溃史选一档并写入设置**（近 30 天 0–1 次→稳定、2–4→偶发、≥5→高频），抽屉里可改可重新检测。新增 `crashHistory()`（次数、7 天/30 天、中位间隔、脾气、异常代码）与 `recommend()` / `preset()`。测试 15 组 564 → **16 组 625** |
 | **1.4.3** | **首屏收敛为四个主项**（缓存 / 内存 / 磁盘 / 保护）：媒体缓存并入缓存、工程信息并入保护，细节默认收起，右上角圆形展开键（`aria-expanded` 同步），展开状态存 `settings.ui`；窄屏 300px 下标题与状态省略号截断但展开键永不被挤出；顺手补 `--accent`（此前进度条取不到色）与四个缺字形的图标符号。新增两张交付截图 `docs/ui-collapsed.png` / `docs/ui-expanded.png` |
-| **1.4.4** | **回退副本（覆盖仍优先）**：新增 `js/backup.js`（纯逻辑：命名/按路径哈希分夹/轮转/挑最新），覆盖原工程之前先 `copyFileSync` 一份带时间戳的副本，默认每工程留 5 份、可关可调；**备份失败不阻止保存**（拿不到副本也不能丢改动）。面板显示「N 份 · 最近多久」，一键「取回最近一份」——**生成新文件**而非回写原路径（AE 打开着工程时替换文件，内存里一保存就把它覆盖了）。**保存位置可见**：设置里显示 `saves.log` 所在目录并可一键打开，简报新增「回退副本」一行。新增 `backup.test.js` 30 项，合计 17 组 655 项 |
+| **1.4.4** | **回退副本（覆盖仍优先）**：新增 `js/backup.js`（纯逻辑：命名/按路径哈希分夹/轮转/挑最新），覆盖原工程之前先 `copyFileSync` 一份带时间戳的副本，默认每工程留 5 份、可关可调；**备份失败不阻止保存**（拿不到副本也不能丢改动）。面板显示「N 份 · 最近多久」，一键「取回最近一份」——**生成新文件**而非回写原路径（AE 打开着工程时替换文件，内存里一保存就把它覆盖了）。**保存位置可见**：设置里显示 `saves.log` 所在目录并可一键打开，简报新增「回退副本」一行。**测试改为跨机器一致**：`scan`/`compat`/`autosave`/`umd`/`optimize` 五组改 fixture 驱动，修复前 runner 上是 598 通过 + 1 失败 + 3 组退出（`scan` 直接 `exit=1`），修复后本机与无 AE 环境都是 660/0；新增 `tests/_no-ae-sim.js` 便于随时复现。合计 17 组 660 项 |
 
 报告本身也带版本：
 
@@ -709,6 +711,7 @@ node tests/wiring.test.js
 | **v7** | 1.4.2 落地：新增 [5.2.1 四个档位](#521-四个档位让判定按本机脾气定标)（含自动选档规则与本机实测结论）；测试表补 `guard-modes`、更新为 **16 组 625 项** |
 | **v8** | 1.4.3 落地：新增 [2.7 首屏只留四个主项](#27-首屏只留四个主项143)（含两张截图与窄屏说明）；[11.1](#111-需求全账本) 补第 14/15 轮；[13.5](#135-待办清单提过但没做不是遗漏) 的「补截图」标记完成；[附录 B](#附录-b-文件清单) 行数按新源码更新 |
 | **v9** | **交付前校正**：原表版本写 1.4.0、测试数写 625/429/564 三处互相矛盾，按实测统一为 **1.4.4 / 17 组 655 项**；补 [11.1](#111-需求全账本) 第 16~20 轮与新增 [11.4 未实施的改进建议](#114-未实施的改进建议原样留给接手者)；[13.5](#135-待办清单提过但没做不是遗漏) 把「备份失败静默」「回退文件名语义」等 9 条按优先级排入；修「面板顶栏显示版本号」的失实描述（界面并不显示版本）；[附录 B](#附录-b-文件清单) 行数按新源码更新 |
+| **v10** | 1.4.4 合入 GitHub：五组测试改 fixture 驱动，断言 655 → **660**（`scan 11→12`、`autosave 15→19`）；[7.5](#75-测试与装没装-ae的关系144-已修) 改写为「修复前后对比」；[13.5](#135-待办清单提过但没做不是遗漏) 的 P0(CI) 标记已修；按实测同步 [7.1](#71-总表)、[7.4](#74-一条命令复跑)、[附录 B.2](#附录-b-文件清单) |
 
 ---
 
@@ -852,7 +855,7 @@ node tests/wiring.test.js
 | 版本 | 1.4.4（只在 `CSXS/manifest.xml` 的 `ExtensionBundleVersion`；面板界面不显示版本） |
 | 源码 | `<工作区>/AESystemMonitor/`，10 个运行文件 + 11 个测试文件，5867 行 |
 | 已部署 | 是。已复制到 `%APPDATA%\Adobe\CEP\extensions\AESystemMonitor`，10 文件、SHA256 与源码 0 差异 |
-| 测试 | 17 组 655 项全过（命令见 [7.4](#74-一条命令复跑)） |
+| 测试 | 17 组 660 项全过；本机与无 AE 环境数字一致（命令见 [7.4](#74-一条命令复跑)） |
 | 面板入口 | `index.html` → `js/main.js` 的 `init()` |
 | 数据入口 | `js/ae-cache.js` 的 `loadPrefs()` / `resolveCacheDir()` / `scanDir()` |
 | AE 侧入口 | `jsx/host.jsx` 的三个 `sysmon_*` 函数 |
@@ -877,7 +880,7 @@ cd <工作区>/AESystemMonitor
 # 1. 改完先自检语法
 node --check js/main.js
 
-# 2. 跑全量测试，必须 655/655
+# 2. 跑全量测试，必须 660/660
 for f in tests/*.test.js; do printf '%-28s' "$f"; node "$f" | tail -1; done
 
 # 3. 部署（Windows PowerShell）
@@ -912,7 +915,7 @@ Copy-Item index.html -Destination $d -Force
 | **P0 ✅ 已修（1.4.1）** | **偏好文件按运行版本选择** | 原缺陷：`loadPrefs()` 无参、`versionDirs()` 降序取第一个，**永远读最高版本**。本机 23.0（115 GB）与 24.2（149 GB）并存，开 AE 2023 会显示 24.2 的配额并去扫 24.2 的缓存目录，填充率偏低、余量偏高 —— 错得"看起来更安全" | 已改为 `loadPrefs(runningVer)`：精确 → 不高于运行版本 → 全局，三级回退；`verMatched` 驱动面板警告；目录定位用 `strict` 防跨版本兜底。`prefs-version.test.js` 32 项 |
 | **P0 ✅ 已修（1.4.1）** | **ETA 的单位错配** | 原缺陷：`Trend.push` 只存缓存字节，`describe(hist, marginGB)` 拿缓存增速除余量；磁盘被别的程序吃掉时显示"缓存未增长"且不给 ETA | 已改为双字段 `{t,b,m}`：ETA 用余量斜率，缓存斜率只解释成因，三种归因分开写；老样本退回旧算法。`trend-margin.test.js` 41 项 |
 | **P1 ✅ 已补** | 面板截图 | 已用无头 Chrome 生成两张（折叠态 / 展开态），存在 `docs/`，见 [2.7](#27-首屏只留四个主项143) | 已解决 |
-| **P0（CI）** | **把 5 组测试改成 fixture 驱动** | 实测：无 AE 的机器上 655 → 598 通过 + 1 失败 + 3 组退出，`scan` 还是 exit=1。这会让 CI 直接红，或者在别处"看起来绿但少测 56 条"（[7.5](#75-哪些测试依赖本机真实-ae实测)） | 移植仓库的 `tests/_fixture.js`，改 `scan`/`compat`/`autosave`/`umd`/`optimize` 五组 |
+| **P0 ✅ 已修（1.4.4）** | **把 5 组测试改成 fixture 驱动** | 实测：无 AE 的机器上 655 → 598 通过 + 1 失败 + 3 组退出，`scan` 还是 exit=1。这会让 CI 直接红，或者在别处"看起来绿但少测 56 条"（[7.5](#75-测试与装没装-ae的关系144-已修)） | 已移植：五组全部 fixture 驱动，本机与无 AE 环境都是 660/0（[7.5](#75-测试与装没装-ae的关系144-已修)） |
 | **P0（信任）** | **备份失败必须出声**（[11.4](#114-未实施的改进建议原样留给接手者) L1） | `makeBackup` 失败仍继续保存是对的，但成功 toast 只说「已自动保存工程」，失败信息只落在卡片一行。用户以为"有回退"，其实没有 | `doSave` 里判 `ST.guard.backupErr`，toast 加半句「本次未留副本」 |
 | **P0（信任）** | **保存成功 toast 带「取回上一版」**（U1） | 备份做完了，但入口埋在展开区。5 秒内可点的"反悔"，才是让人敢依赖它的前提 | toast 组件加一个按钮调 `restoreLatest` |
 | P1 | 回退副本名用**备份时刻**而非取回时刻（L2） | 现在是 `restoreName(..., Date.now())`，目录里几份副本分不清谁对应哪次备份 | 传 `list[0].mtime`，改 1 行 + `backup.test.js` 补 2 条 |
@@ -922,7 +925,7 @@ Copy-Item index.html -Destination $d -Force
 | P2 | 旧自动保存版本清理（F2） | 本机同目录 7 个 `.aep`，5 个是 `自动保存 31~35` 旧版本 | 需要确认流程 + **回收站调用，不许 `unlink`** |
 | P2 | 对比度（U5） | `--fg-3` 是 `#5d5d5d`，在 `#1a1a1a` 上约 2.5:1，而 9px 小字到处都是（WCAG AA 要 4.5:1） | 一行 CSS 提到 `#8a8a8a` |
 | P3 | 文案与小图形（U2/U3/U4/U6） | 失败提示不给下一步、档位是黑话、折叠窗看不到保护状态、「余量」太抽象 | 纯 UI，无逻辑风险 |
-| P1 | 拆分 `js/main.js`（2537 行，占运行代码 44%） | 最大的技术债，改动易误伤 | 纯重构，655 项测试可兜底 |
+| P1 | 拆分 `js/main.js`（2537 行，占运行代码 44%） | 最大的技术债，改动易误伤 | 纯重构，660 项测试可兜底 |
 | P2 | 免打扰时段（如 9:00–19:00） | 晚上加班不吵人 | 纯逻辑，`reminder.js` 加时间窗，好测 |
 | P2 | 缓存盘与工程盘同盘提示 | 同盘会互相抢空间，易触发"磁盘不足" | 比对 `path.parse().root` |
 | P2 | 上限建议（当前上限远大于实际用量） | 本机上限 149 GB、实占 5.94 GB（4%），相当于白占 143 GB 的"所需空间"，把余量压到 +38 GB；调到 60 GB 后余量立刻变 +127 GB，且不影响使用 | 纯逻辑：比较峰值用量与上限，给出建议值 |
@@ -942,7 +945,7 @@ Copy-Item index.html -Destination $d -Force
 | 提醒不响 | 是否在渲染中（会静音）；该条提醒的开关；是否刚"关掉又打开"（计时会重新开始） |
 | 崩溃保护没动作 | 六道安全闸（5.4）逐条对照，最常见是"工程没保存过"或"没有未保存改动" |
 | 改了代码但界面没变 | 没重开面板标签（13.3 第 4 步） |
-| 测试 SKIP 了 | 那台机器没有真实 AE 偏好。`compat` / `autosave` 整组 SKIP、`scan` 跳过且 exit=1、`umd` 会真失败、`optimize` 少 6 条 —— 详见 [7.5](#75-哪些测试依赖本机真实-ae实测)。**SKIP 不算通过** |
+| 测试 SKIP 了 | 那台机器没有真实 AE 偏好。`compat` / `autosave` 整组 SKIP、`scan` 跳过且 exit=1、`umd` 会真失败、`optimize` 少 6 条 —— 详见 [7.5](#75-测试与装没装-ae的关系144-已修)。**SKIP 不算通过** |
 
 ### 13.7 可直接粘贴给 AI 的提示词
 
@@ -970,7 +973,7 @@ Copy-Item index.html -Destination $d -Force
 7) 不要用同步子进程取磁盘/系统信息（1.4.0 刚把 PowerShell 移出热路径）
 8) 新增可调参数一律进 js/settings.js 的 SCHEMA，不要裸存 localStorage
 
-工作流：改代码 → node --check → 跑 tests/ 全部（必须 655/655，0 失败）
+工作流：改代码 → node --check → 跑 tests/ 全部（必须 660/660，0 失败）
 → 复制到 %APPDATA%\Adobe\CEP\extensions\AESystemMonitor → 关掉面板标签重开。
 
 我要你做的事：<在这里写你的目标>
@@ -1120,8 +1123,8 @@ Copy-Item index.html -Destination $d -Force
 
 ### B.2 测试文件（17 个，不部署）
 
-`tests/` 下共 2309 行、655 项断言。**12 组自带 fixture**（假 WER、假缓存树、纯逻辑、假 AE 对象），**5 组仍读本机真实 AE**（`scan` / `compat` / `autosave` / `umd` / `optimize`）。
-用 `node -r ./tests/_no-ae-sim.js <test>` 可以模拟"没装 AE 的机器"看真实差距，结论见 [7.5](#75-哪些测试依赖本机真实-ae实测)。各文件覆盖范围见 [7.1](#71-总表)。
+`tests/` 下共 2517 行、660 项断言。**17 组全部不依赖本机装没装 AE**：13 组是纯逻辑 / 假 AE 对象 / 假 WER，5 组用 `_fixture.js` 造的假 AE 环境。
+`tests/_no-ae-sim.js` 可以把 `os.homedir()` 指到空目录复现 runner 环境，结论见 [7.5](#75-测试与装没装-ae的关系144-已修)。各文件覆盖范围见 [7.1](#71-总表)。
 
 ### B.3 文档
 

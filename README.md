@@ -236,18 +236,18 @@ console.log(AE.loadAutoSavePrefs());  // AE 自带自动保存的间隔与目录
 console.log(AE.resolveCacheDir(...)); // 真实缓存目录
 ```
 
-当前状态：`tests/` 下有十七组回归测试，共 **655 项**断言全绿。
+当前状态：`tests/` 下有十七组回归测试，共 **660 项**断言全绿；换一台没装 AE 的机器跑（如 CI runner），数字完全一致。
 
 ```bash
 node tests/umd.test.js            # 11 项：模块在 CEP / 浏览器 / Node 三种环境下都能被取到
-node tests/scan.test.js           # 11 项：扫描结果与独立实现逐字节比对，含老 Node 降级路径
+node tests/scan.test.js           # 12 项：扫描结果与独立实现逐字节比对，含老 Node 降级路径
 node tests/settings.test.js       # 37 项：脏数据归一化、数值裁剪、自定义分钟不被吸附
 node tests/reminder.test.js       # 50 项：间隔边界、关闭再开启、稍后提醒、阈值判定、渲染静音不补响
 node tests/guard.test.js          # 50 项：风险分级、两种触发、冷却、渲染跳过、写盘风暴防护
 node tests/guard-crash.test.js    # 41 项：提交内存信号、崩溃史→不稳定期、有效阈值下限保护
 node tests/trend.test.js          # 40 项：增速估算、窗口裁剪、缓存回落、样本不足不给结论
 node tests/trend-margin.test.js   # 41 项：双字段采样，ETA 用余量斜率、缓存斜率只解释成因
-node tests/autosave.test.js       # 15 项：读取 AE 自带自动保存配置（真实偏好文件）
+node tests/autosave.test.js       # 19 项：读取 AE 自带自动保存配置（fixture 偏好文件）
 node tests/hostjsx.test.js        # 39 项：用假的 AE 对象真跑 ExtendScript，验证属性名与降级
 node tests/compat.test.js         # 21 项：四种老版本 Node 环境下的读取与扫描一致性
 node tests/prefs-version.test.js  # 32 项：偏好按运行版本对齐，缓存目录不跨版本兜底
