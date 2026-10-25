@@ -174,5 +174,68 @@ ok('摘要在输入时实时预览', /previewRemindSummary/.test(mainJs));
 ok('有常用间隔预设按钮', ids.has('btnRemindPreset'));
 ok('预设按钮已绑定', /btnRemindPreset'\)\.addEventListener\('click', applyRemindPreset\)/.test(mainJs));
 
+console.log('\n[14] 带文字的按钮不能用方形图标尺寸（1.6.1）');
+/* 背景：.ibtn.sm 是 17x17 的方形图标按钮（「↗」「✕」这类单字符）。
+ * 一旦误用它装「按预设填入」这种多字按钮，文字会在格子里换行成多行、
+ * 竖向溢出压到上下相邻的文字上 —— 视觉上就是两行字叠在一起。
+ * 这类错只有真渲染才看得见，但可以先从静态侧拦一道：
+ * 多字按钮必须带 wide/logbtn 这类自带尺寸的修饰类。 */
+const ICON_ONLY = /^[\s\W_]*$/;   // 只含符号/空白 → 算图标，可以是方形
+const btnTags = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)];
+const textBtns = btnTags.map(m => {
+  const attrs = m[1];
+  const id = (attrs.match(/id="([^"]+)"/) || [])[1] || '';
+  const cls = (attrs.match(/class="([^"]+)"/) || [])[1] || '';
+  const text = m[2].replace(/<[^>]*>/g, '').replace(/&[a-z]+;/g, '').trim();
+  return { id, cls, text, attrs };
+}).filter(b => b.text && !ICON_ONLY.test(b.text));
+
+ok('HTML 里有带文字的按钮（否则这组测试没意义）', textBtns.length > 0,
+   textBtns.map(b => b.id || b.text).join(', '));
+
+const ibtnTextBtns = textBtns.filter(b => /\bibtn\b/.test(b.cls));
+const noSize = ibtnTextBtns.filter(b => !/\b(wide|logbtn)\b/.test(b.cls));
+ok('所有带文字的 ibtn 按钮都带尺寸修饰类（wide/logbtn）',
+   noSize.length === 0,
+   noSize.map(b => b.id + '(' + b.text + ')').join(', '));
+
+/* 具体到这次的按钮：必须用 .wide，且 .wide 必须真的给出自适应尺寸 */
+ok('预设按钮用的是 .ibtn.sm.wide',
+   /<button[^>]*id="btnRemindPreset"[^>]*class="[^"]*\bwide\b/.test(html) ||
+   /<button[^>]*class="[^"]*\bwide\b[^"]*"[^>]*id="btnRemindPreset"/.test(html));
+ok('.ibtn.sm.wide 有自适应宽度（不能是固定 17px）',
+   /\.ibtn\.sm\.wide\s*\{[^}]*width:\s*auto/.test(css));
+ok('.ibtn.sm.wide 禁止换行（否则还是会竖向溢出）',
+   /\.ibtn\.sm\.wide\s*\{[^}]*white-space:\s*nowrap/.test(css));
+ok('.ibtn.sm.wide 有足够内边距',
+   /\.ibtn\.sm\.wide\s*\{[^}]*padding:\s*0\s+9px/.test(css));
+ok('预设按钮不再用裸的 .ibtn.sm',
+   !/<button[^>]*id="btnRemindPreset"[^>]*class="ibtn sm"/.test(html));
+
+console.log('\n[15] 静态 HTML 里不残留 Markdown 语法（1.6.1）');
+/* 面板的说明文字是纯 HTML，不是 Markdown 渲染器。
+ * 写 **强调** 只会在界面上原样显示星号（用户反馈过）。 */
+const hintTexts = [...html.matchAll(/class="hint"[^>]*>([\s\S]*?)<\/div>/g)].map(m => m[1]);
+ok('hint 说明文字里没有 Markdown 星号',
+   hintTexts.every(t => !/\*\*/.test(t)),
+   hintTexts.filter(t => /\*\*/.test(t)).map(t => t.replace(/\s+/g, ' ').slice(0, 40)).join(' | '));
+ok('提示框用 <b> 而不是 **强调**',
+   /提醒是<b>静默<\/b>的/.test(html));
+
+console.log('\n[16] 抽屉里的行在窄面板下不能硬挤（1.6.1）');
+/* 窄面板下 flex 行里的 label 会被压到 9px 宽、每个字占一行（竖排），
+ * 或者文字直接溢出、压到右边的输入框/单位上。
+ * 正确做法：行允许换行 + label 有最小宽度，两者一起兜底。 */
+ok('.row 允许换行（空间不够就整行换行，不硬挤）',
+   /\.row\s*\{[^}]*flex-wrap:\s*wrap/.test(css));
+ok('.row > label 有最小宽度（不能被压成一字一行）',
+   /\.row\s*>\s*label\s*\{[^}]*min-width:\s*[\d.]+em/.test(css));
+ok('.row > label 不用 min-width:0（那正是竖排的成因）',
+   !/\.row\s*>\s*label\s*\{[^}]*min-width:\s*0[;\s]/.test(css));
+ok('.row select 可收缩（不然它把 label 挤扁）',
+   /\.row select\s*\{[^}]*flex:\s*0\s+1\s+auto/.test(css));
+ok('预设提示小字不换行（宁可截断也不要竖排）',
+   /\.row #remindPresetHint\s*\{[^}]*white-space:\s*nowrap/.test(css));
+
 console.log(`\n===== ${pass} 通过, ${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);

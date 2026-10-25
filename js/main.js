@@ -1138,12 +1138,19 @@
     return !!(Backup && USR && USR.crashGuard && USR.crashGuard.backup);
   }
 
+  /* 副本目录名：必须让用户看得懂。
+   * 旧版用的是点开头的 .ae-system-monitor-backups —— Windows 并不隐藏点开头的目录，
+   * 用户只会在素材盘里看到一个来路不明的文件夹，还会被网盘/版本库一起同步。
+   * 1.6.1 起写进可见的中文名；旧目录仍可读（legacyBackupDirFor），只是不再往里写。 */
+  var BACKUP_DIR_NAME = 'AE-System-Monitor 备份';
+  var BACKUP_DIR_OLD = '.ae-system-monitor-backups';
+
   function backupRoot(projectPath) {
     // 优先放在工程所在卷，避免大工程备份挤满系统盘；路径不可用时回退到本机目录。
     if (projectPath && hasNode && pathmod) {
       try {
         var parent = pathmod.dirname(projectPath);
-        if (fs.existsSync(parent)) return pathmod.join(parent, '.ae-system-monitor-backups');
+        if (fs.existsSync(parent)) return pathmod.join(parent, BACKUP_DIR_NAME);
       } catch (e) {}
     }
     var dir = localDataDir();
@@ -1154,6 +1161,17 @@
     var root = backupRoot(projectPath);
     if (!root || !Backup || !projectPath) return '';
     return pathmod.join(root, Backup.folderFor(projectPath));
+  }
+
+  /* 旧位置：只读不写。升级后已有的副本不会凭空消失，用户也不会以为「我的副本没了」 */
+  function legacyBackupDirFor(projectPath) {
+    if (!projectPath || !Backup || !hasNode || !pathmod) return '';
+    try {
+      var parent = pathmod.dirname(projectPath);
+      var root = pathmod.join(parent, BACKUP_DIR_OLD);
+      if (!fs.existsSync(root)) return '';
+      return pathmod.join(root, Backup.folderFor(projectPath));
+    } catch (e) { return ''; }
   }
 
   function mkdirp(dir) {
@@ -1169,20 +1187,26 @@
     } catch (e) {}
   }
 
-  /* 最新在前：文件名里带时间戳，字典序倒排即时间倒排 */
+  /* 最新在前：文件名里带时间戳，字典序倒排即时间倒排。
+   * 两处过滤是有意的：*.part 是原子写的半成品（正则本身就不匹配 *.aep），
+   * 0 字节的残档不参与「最新一份」，否则取回会挑中一个打不开的文件。 */
   function listBackups(projectPath) {
-    var dir = backupDirFor(projectPath);
-    if (!dir || !fs || !fs.existsSync(dir)) return [];
     var out = [];
-    try {
-      fs.readdirSync(dir).forEach(function (n) {
-        if (!/\.aepx?$/i.test(n)) return;
-        var p = pathmod.join(dir, n);
-        var st = null;
-        try { st = fs.statSync(p); } catch (e) { return; }
-        out.push({ name: n, path: p, size: st.size, mtime: st.mtimeMs });
-      });
-    } catch (e) {}
+    function scan(dir, isOld) {
+      if (!dir || !fs || !fs.existsSync(dir)) return;
+      try {
+        fs.readdirSync(dir).forEach(function (n) {
+          if (!/\.aepx?$/i.test(n)) return;
+          var p = pathmod.join(dir, n);
+          var st = null;
+          try { st = fs.statSync(p); } catch (e) { return; }
+          if (!st.size) return;
+          out.push({ name: n, path: p, size: st.size, mtime: st.mtimeMs, old: !!isOld });
+        });
+      } catch (e) {}
+    }
+    scan(backupDirFor(projectPath), false);
+    scan(legacyBackupDirFor(projectPath), true);
     out.sort(function (a, b) { return a.name < b.name ? 1 : -1; });
     return out;
   }
@@ -1196,17 +1220,17 @@
       if (!dir) return { ok: false, skipped: true };
       mkdirp(dir);
 
-      var dest = pathmod.join(dir, Backup.backupName(projectPath, Date.now()));
-      fs.copyFileSync(projectPath, dest);
-      // 再次核验字节数，避免不完整副本被标成可回退版本。
-      if (fs.statSync(dest).size !== fs.statSync(projectPath).size) {
-        try { fs.unlinkSync(dest); } catch (ignore) {}
-        return { ok: false, err: '副本大小校验未通过' };
-      }
+      // 先写 <名字>.part 再 rename：中途断电/进程被杀不会留下一个「带着正常时间戳的半截文件」，
+      // 而取回逻辑按名字倒排取最新 —— 那种文件恰好会被挑中。拿 taken 兜住同毫秒撞名。
+      var taken = listBackups(projectPath).map(function (b) { return b.name; });
+      var dest = pathmod.join(dir, Backup.backupName(projectPath, Date.now(), taken));
+      var w = Backup.atomicCopy(fs, pathmod, projectPath, dest);
+      if (!w.ok) return { ok: false, err: w.err || '副本写入失败' };
 
-      // 轮转：只留最近 keep 份
+      // 轮转：只留最近 keep 份（旧目录里的不碰，删不删由用户自己定）
       var keepN = (USR.crashGuard && USR.crashGuard.keepBackups) || 5;
-      var names = listBackups(projectPath).map(function (b) { return b.name; });
+      var names = listBackups(projectPath).filter(function (b) { return !b.old; })
+        .map(function (b) { return b.name; });
       Backup.rotate(names, keepN).remove.forEach(function (n) {
         try { fs.unlinkSync(pathmod.join(dir, n)); } catch (e) {}
       });
@@ -1223,16 +1247,20 @@
     var list = listBackups(ST.projectPath);
     if (!list.length) { toast('还没有回退副本（下次保护保存时生成）'); return; }
 
+    // list[0] 已经过滤掉 0 字节与 .part；取回本身也走原子写，
+    // 否则大工程写到一半失败会留下一个「看着能用」的半截副本。
+    var pick = list[0];
     var dir = pathmod.dirname(ST.projectPath);
-    var dest = pathmod.join(dir, Backup.restoreName(ST.projectPath, list[0].mtime));
+    var taken = [];
     try {
-      if (fs.existsSync(dest)) { toast('同名回退副本已存在，稍后再试'); return; }
-      fs.copyFileSync(list[0].path, dest);
-      toast('已生成回退副本：' + pathmod.basename(dest));
-      openFolder(dir);
-    } catch (e) {
-      toast('取回失败：' + (e.message || e));
-    }
+      fs.readdirSync(dir).forEach(function (n) { if (/\.aepx?$/i.test(n)) taken.push(n); });
+    } catch (e) {}
+
+    var dest = pathmod.join(dir, Backup.uniqueName(Backup.restoreName(ST.projectPath, pick.mtime), taken));
+    var w = Backup.atomicCopy(fs, pathmod, pick.path, dest);
+    if (!w.ok) { toast('取回失败：' + w.err); return; }
+    toast('已生成回退副本：' + pathmod.basename(dest) + (pick.old ? '（来自旧备份目录）' : ''));
+    openFolder(dir);
   }
 
   function pad2(n) { return n < 10 ? '0' + n : '' + n; }
@@ -1426,14 +1454,22 @@
     }
 
     var list = listBackups(ST.projectPath);
+    var dir = backupDirFor(ST.projectPath) || '';
+    var oldN = list.filter(function (b) { return b.old; }).length;
+
+    // 目录固定写进 title：这一行本来就是「副本在哪」，不该只在「暂无」时才给路径。
+    var tail = dir ? '\n\n目录：' + dir : '';
+    if (oldN) tail += '\n旧位置（1.6.0 及以前）还有 ' + oldN + ' 份，可直接取回，不再往里写';
+
     if (!list.length) {
       el.textContent = '回退副本：暂无（下次保护保存时生成）';
-      el.title = backupDirFor(ST.projectPath) || '';
+      el.title = (dir || '') + tail;
     } else {
-      el.textContent = '回退副本 ' + list.length + ' 份 · 最近 ' + agoText(list[0].mtime);
+      el.textContent = '回退副本 ' + list.length + ' 份 · 最近 ' + agoText(list[0].mtime) +
+        (oldN ? ' · 旧位置 ' + oldN + ' 份' : '');
       el.title = list.slice(0, 8).map(function (b) {
-        return stamp(b.mtime) + '　' + fmtBytes(b.size);
-      }).join('\n');
+        return stamp(b.mtime) + '　' + fmtBytes(b.size) + (b.old ? '（旧位置）' : '');
+      }).join('\n') + tail;
     }
     if (ST.guard.backupErr) el.textContent += ' · 上次备份失败：' + ST.guard.backupErr;
   }
@@ -2647,7 +2683,13 @@
       bkOpen.addEventListener('click', function () {
         var d = ST.projectPath ? backupDirFor(ST.projectPath) : backupRoot();
         if (!d) { toast('需要 Node 环境'); return; }
-        if (!fs.existsSync(d)) { toast('还没有备份目录（下次保护保存时创建）'); return; }
+        // 目录还没被创建时：有旧位置的副本就打开旧位置，否则才提示
+        if (!fs.existsSync(d)) {
+          var oldDir = ST.projectPath ? legacyBackupDirFor(ST.projectPath) : '';
+          if (oldDir && fs.existsSync(oldDir)) { openFolder(oldDir); return; }
+          toast('还没有备份目录（下次保护保存时创建）');
+          return;
+        }
         openFolder(d);
       });
     }

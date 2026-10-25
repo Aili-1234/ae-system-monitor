@@ -23,9 +23,12 @@ const T = Date.UTC(2026, 9, 25, 9, 40, 55);   // 2026-10-25 17:40:55 (+08:00)
 console.log('\n[1] 时间戳');
 {
   const s = B.stamp(T);
-  ok('格式 YYYYMMDD-HHmmss', /^\d{8}-\d{6}$/.test(s), s);
+  ok('格式 YYYYMMDD-HHmmss-mmm（带毫秒）', /^\d{8}-\d{6}-\d{3}$/.test(s), s);
   ok('能被字典序比较（新 > 旧）', B.stamp(T + 1000) > B.stamp(T), B.stamp(T) + ' < ' + B.stamp(T + 1000));
+  ok('同一秒内的两次保存也不同名（1.6.1）',
+     B.stamp(T) !== B.stamp(T + 1) && B.stamp(T + 1) > B.stamp(T), B.stamp(T) + ' / ' + B.stamp(T + 1));
   ok('补零（个位数月日时分秒）', B.stamp(Date.UTC(2026, 0, 2, 3, 4, 5)).slice(4, 8) !== '142', B.stamp(Date.UTC(2026, 0, 2, 3, 4, 5)));
+  ok('毫秒补三位（5ms → 005）', /-005$/.test(B.stamp(Date.UTC(2026, 9, 25, 9, 40, 5, 5))), B.stamp(Date.UTC(2026, 9, 25, 9, 40, 5, 5)));
   ok('非法时间也能返回字符串', typeof B.stamp(NaN) === 'string');
 }
 
@@ -55,6 +58,13 @@ console.log('\n[4] 备份文件名保留扩展名，且带时间戳');
   ok('.aepx 不被改成 .aep', /\.aepx$/.test(n2), n2);
   ok('同一时刻不同工程不重名',
      B.backupName('D:\\x\\甲.aep', T) !== B.backupName('D:\\x\\乙.aep', T));
+  const taken = [B.backupName('D:\\x\\工程.aep', T)];
+  ok('和已有副本撞名时自动加 -2（1.6.1）',
+     /-2\.aep$/.test(B.backupName('D:\\x\\工程.aep', T, taken)), B.backupName('D:\\x\\工程.aep', T, taken));
+  const taken2 = taken.concat([B.backupName('D:\\x\\工程.aep', T, taken)]);
+  ok('连 -2 也被占时加 -3（1.6.1）',
+     /-3\.aep$/.test(B.backupName('D:\\x\\工程.aep', T, taken2)), B.backupName('D:\\x\\工程.aep', T, taken2));
+  ok('没撞名时原样返回（1.6.1）', B.backupName('D:\\x\\工程.aep', T, []) === B.backupName('D:\\x\\工程.aep', T));
 }
 
 console.log('\n[5] 回退文件名：绝不等于原文件名');
@@ -98,6 +108,65 @@ console.log('\n[7] 挑最新');
   ok('空列表返回 null', B.latest([]) === null);
   ok('单份原样返回', B.latest(['only.aep']) === 'only.aep');
 }
+
+/* 假 fs：只实现 atomicCopy 用到的那几个方法，用来注入「写一半 / 字节数不符 / rename 失败」。
+ * 这几个失败在真机上等于「断电 / 磁盘满 / 权限被拒」，手动测不出来，只能注入。 */
+function fakeFs(opt) {
+  opt = opt || {};
+  const f = {};
+  f[opt.src] = { size: opt.srcSize !== undefined ? opt.srcSize : 1000 };
+  if (opt.stalePart) f[opt.stalePart] = { size: 7 };
+  return {
+    files: f,
+    existsSync(p) { return p in f; },
+    unlinkSync(p) { delete f[p]; },
+    copyFileSync(src, part) {
+      if (opt.copyThrows) throw new Error(opt.copyThrows);
+      f[part] = { size: opt.wroteSize !== undefined ? opt.wroteSize : (f[src] ? f[src].size : 0) };
+    },
+    statSync(p) {
+      if (!(p in f)) throw new Error('ENOENT: ' + p);
+      return { size: f[p].size };
+    },
+    renameSync(from, to) {
+      if (opt.renameThrows) throw new Error(opt.renameThrows);
+      if (to in f) throw new Error('EEXIST: ' + to);
+      f[to] = f[from]; delete f[from];
+    }
+  };
+}
+const SRC = '/p/工程.aep', DEST = '/b/工程__20261025-174055-123.aep';
+
+console.log('\n[8] 原子落盘：（1.6.1）先写 .part 再 rename，失败不留残档');
+{
+  const fs1 = fakeFs({ src: SRC });
+  const r1 = B.atomicCopy(fs1, path, SRC, DEST);
+  ok('成功时返回 ok', r1.ok === true, r1.err);
+  ok('成功时只有最终文件、没有 .part',
+     (DEST in fs1.files) && !((DEST + '.part') in fs1.files));
+
+  const fs2 = fakeFs({ src: SRC, wroteSize: 300 });
+  const r2 = B.atomicCopy(fs2, path, SRC, DEST);
+  ok('字节数不符时 fail 且带说明', r2.ok === false && /大小校验未通过/.test(r2.err || ''), r2.err);
+  ok('字节数不符时不留最终文件，也不留 .part',
+     !(DEST in fs2.files) && !((DEST + '.part') in fs2.files));
+
+  const fs3 = fakeFs({ src: SRC, copyThrows: '磁盘已满' });
+  const r3 = B.atomicCopy(fs3, path, SRC, DEST);
+  ok('copy 抛错时 fail 且保留原错误', r3.ok === false && /磁盘已满/.test(r3.err || ''), r3.err);
+
+  const fs4 = fakeFs({ src: SRC, renameThrows: 'EPERM' });
+  const r4 = B.atomicCopy(fs4, path, SRC, DEST);
+  ok('rename 失败时 fail', r4.ok === false && /EPERM/.test(r4.err || ''), r4.err);
+  ok('rename 失败时清掉 .part，不留半成品',
+     !(DEST in fs4.files) && !((DEST + '.part') in fs4.files));
+
+  const fs5 = fakeFs({ src: SRC, stalePart: DEST + '.part' });
+  const r5 = B.atomicCopy(fs5, pathmod2(), SRC, DEST);
+  ok('上次残留的 .part 会被先清掉再重写', r5.ok === true && fs5.files[DEST + '.part'] === undefined);
+}
+
+function pathmod2() { return path; }
 
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

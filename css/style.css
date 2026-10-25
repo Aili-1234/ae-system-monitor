@@ -530,6 +530,31 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 }
 .ibtn.sm.logbtn:hover { border-color: var(--fg-3); }
 
+/* 「按预设填入」也是带字的按钮。.ibtn.sm 的 17px 方形尺寸是给「↗」「✕」这类
+   单字符图标用的 —— 塞进五个汉字后文字撑破按钮、溢出到相邻的说明文字上，
+   视觉上就成了两行字叠在一起。所以另开一个按内容自适应的尺寸。 */
+.ibtn.sm.wide {
+  width: auto;
+  height: 20px;
+  padding: 0 9px;
+  font-size: 9.5px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.ibtn.sm.wide:hover { border-color: var(--fg-3); }
+
+/* 预设按钮右边那行小字：窄面板下要能缩，别把按钮挤出可视区。
+   但 min-width:0 单独用会把它压成 5px 宽的竖条（一个字一行），
+   所以再加 nowrap —— 宁可整体截断，也不要竖排。 */
+.row #remindPresetHint {
+  flex: 0 1 auto;
+  text-align: right;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* 「打开日志文件夹」按钮：抽屉里唯一需要占满一行的按钮 */
 .logbtn {
   width: 100%; height: 22px;
@@ -709,8 +734,17 @@ body.compact .mini {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 0;
   font-size: 11px; color: var(--fg-2);
+  /* 窄面板下一行塞不下就整行换行，不硬挤 ——
+     硬挤的结果是标签文字溢出、压到右边的输入框/单位上。 */
+  flex-wrap: wrap;
 }
-.row > label { flex: 1 1 auto; cursor: pointer; min-width: 0; }
+.row > label {
+  flex: 1 1 auto;
+  cursor: pointer;
+  /* 不能让 label 被压成一字一行（竖排），但也不许溢出到右边的控件上：
+     给一个下限，让文字正常横向换行；空间真不够时由上面的 wrap 换到下一行。 */
+  min-width: 4.5em;
+}
 .row .u { font-size: 9px; color: var(--fg-3); flex: 0 0 auto; }
 
 input[type="number"] {
@@ -746,6 +780,10 @@ input[type="checkbox"]:checked { background: var(--fg-2); border-color: var(--fg
   font-size: 10.5px;
   color: var(--fg);
   border-bottom-color: var(--line-2);
+  /* 窄面板下让 select 自己缩，别把左边的 label 挤成竖排 */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 62%;
 }
 
 .dw-reset {
