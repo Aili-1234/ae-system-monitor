@@ -90,9 +90,15 @@ git clone https://github.com/Aili-1234/ae-system-monitor.git AESystemMonitor
 for %f in (tests\*.test.js) do node %f
 ```
 
-11 组、424 项断言。其中 `optimize.test.js` 专门守着本次优化的四条路径（`fs.statfsSync` 优先、日志可关、其余降级链、`[hidden]` 不被作者样式盖掉）。
+11 组、429 项断言。其中 `optimize.test.js` 专门守着本次优化的四条路径（`fs.statfsSync` 优先、日志可关、其余降级链、`[hidden]` 不被作者样式盖掉）。
 
-`tests/scan.test.js`、`autosave.test.js`、`compat.test.js`、`optimize.test.js` 会读本机真实 AE 偏好；没装 AE 的机器上会 `SKIP` 而不是失败。
+**测试与「这台机器有没有装 AE」无关**：`tests/_fixture.js` 会临时造一份假 AE 环境（偏好文件、自动保存目录、缓存树），所以任何机器、任何 Node 版本跑出来的数字都一致。这也正是 CI 能在干净的 runner 上变绿的原因。
+
+CI 在 GitHub Actions 上跑，Windows 是硬门禁、Linux 分支跑但不阻断：
+
+```bat
+bash tools/ci-local.sh
+```
 
 ## 结构
 

@@ -8,9 +8,14 @@
  * 这里把 fs 换成「残缺版」，验证核心读取不会因此全线失效。
  * ============================================================ */
 const realFs = require('fs');
-const os = require('os');
 const path = require('path');
 const AECache = require(path.join(__dirname, '..', 'js', 'ae-cache.js'));
+const { makeFixture, CN_USER } = require('./_fixture.js');
+
+// 用 fixture 的假 AE 环境：这组测试验的是「残缺 fs 下读取还成立吗」，
+// 不该依赖本机是否装了 AE，否则 CI 上必红。
+const fx = makeFixture({ files: 6, sizeEach: 1024 });
+const os = fx.osStub;
 
 let pass = 0, fail = 0;
 function ok(name, cond, extra) {
@@ -67,8 +72,8 @@ for (const [label, opts] of Object.entries(VARIANTS)) {
   prefsResults[label] = p;
   ok(label + ' 读到偏好', !!p, p ? ('上限 ' + p.maxSizeGB + ' GB') : 'null');
   if (p) {
-    ok('  上限 = 149', p.maxSizeGB === 149, p.maxSizeGB);
-    ok('  中文用户名解码正确', p.folder.indexOf('李') >= 0 || p.folder.indexOf(os.userInfo().username) >= 0, p.folder);
+    ok('  上限 = ' + fx.maxGB, p.maxSizeGB === fx.maxGB, p.maxSizeGB);
+    ok('  中文用户名解码正确', p.folder.indexOf(CN_USER) >= 0, p.folder);
   }
 }
 
@@ -83,9 +88,9 @@ console.log('\n[3] 各版本下目录扫描结果一致');
 const base = AECache.create({ fs: realFs, os, path, Buffer });
 const prefs = base.loadPrefs();
 if (!prefs) {
-  console.log('  SKIP  本机无 AE 偏好，跳过扫描比对');
+  ok('fixture 偏好可读', false, 'null');
 } else {
-  const dir = base.resolveCacheDir(prefs.folder, base.verShort(prefs.ver));
+  const dir = fx.cacheDir;
   console.log('  目标: ' + dir);
 
   (async () => {

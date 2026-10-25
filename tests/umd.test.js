@@ -5,7 +5,11 @@
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
-const os = require('os');
+const { makeFixture } = require('./_fixture.js');
+
+// 假 AE 环境：本组验的是「CEP 页面上下文能不能加载」，不该依赖本机装没装 AE
+const fx = makeFixture({ files: 4, sizeEach: 512 });
+const os = fx.osStub;
 
 const code = fs.readFileSync(path.join(__dirname, '..', 'js', 'ae-cache.js'), 'utf8');
 
@@ -43,10 +47,10 @@ if (sandboxA.window.AECache) {
   const p = AE.loadPrefs();
   ok('CEP 环境下能读到 AE 2024 偏好', !!p, p ? p.path.split('\\').pop() : 'null');
   if (p) {
-    ok('上限 = 149 GB', p.maxSizeGB === 149, p.maxSizeGB);
+    ok('上限 = ' + fx.maxGB + ' GB', p.maxSizeGB === fx.maxGB, p.maxSizeGB);
     ok('路径已解码', !/"[0-9A-F]{4,}"/.test(p.folder), p.folder);
     const dir = AE.resolveCacheDir(p.folder, AE.verShort(p.ver));
-    ok('缓存目录命中', /Disk Cache.*\.noindex$/i.test(dir));
+    ok('缓存目录命中', /Disk Cache.*\.noindex$/i.test(dir), dir);
   }
 }
 

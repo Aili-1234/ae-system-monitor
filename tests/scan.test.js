@@ -4,9 +4,13 @@
  * 两者都应得到同样的 1.47GB / 608 文件。
  */
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const mod = require('../js/ae-cache.js');
+const { makeFixture } = require('./_fixture.js');
+
+// 用 fixture 造一棵确定的缓存树（6 个文件 × 1 KB），而不是扫本机真实缓存：
+// 否则「本机没装 AE」时整组会误报失败，CI 上必红。
+const fx = makeFixture({ files: 6, sizeEach: 1024 });
 
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { c ? pass++ : fail++; console.log(`  ${c ? 'PASS' : 'FAIL'}  ${n}${x !== undefined ? '  -> ' + x : ''}`); };
@@ -51,10 +55,10 @@ function groundTruth(root) {
 }
 
 (async () => {
-  const base = mod.create({ fs, os, path, Buffer });
+  const base = mod.create({ fs, os: fx.osStub, path, Buffer });
   const prefs = base.loadPrefs();
-  if (!prefs) { console.log('未读到偏好，跳过'); process.exit(1); }
-  const dir = base.resolveCacheDir(prefs.folder, base.verShort(prefs.ver));
+  ok('fixture 偏好可读', !!prefs, prefs ? prefs.ver : 'null');
+  const dir = fx.cacheDir;
   console.log('目标目录: ' + dir + '\n');
 
   const truth = groundTruth(dir);
@@ -71,7 +75,7 @@ function groundTruth(root) {
   ok('未超时', r1.expires === false);
 
   console.log('\n[2] 降级路径（无 fs.promises，readdir 返回字符串）');
-  const legacy = mod.create({ fs: makeLegacyFs(), os, path, Buffer });
+  const legacy = mod.create({ fs: makeLegacyFs(), os: fx.osStub, path, Buffer });
   const t2 = Date.now();
   const r2 = await legacy.scanDir(dir, { cap: 250000 });
   console.log(`  耗时 ${Date.now() - t2} ms`);
@@ -86,7 +90,7 @@ function groundTruth(root) {
   ok('不存在的目录返回全 0', empty.bytes === 0 && empty.files === 0);
   const none = await base.scanDir('', {});
   ok('空路径不抛异常', none.bytes === 0);
-  const tiny = await base.scanDir(dir, { cap: 20 });
+  const tiny = await base.scanDir(dir, { cap: 3 });
   ok('cap 极小时标记截断', tiny.truncated === true, 'files=' + tiny.files);
 
   console.log(`\n===== ${pass} 通过, ${fail} 失败 =====`);
