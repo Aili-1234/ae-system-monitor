@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>System Monitor</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ==================== 完整面板 ==================== -->
+<div class="app" id="appFull">
+
+  <header class="hd">
+    <div class="hd-left">
+      <span class="live" id="liveDot"></span>
+      <span class="hd-title" id="hdTitle">系统监视器</span>
+      <span class="badge" id="modeBadge" hidden>预览</span>
+      <span class="badge mute" id="renderBadge" hidden>渲染中 · 静音</span>
+    </div>
+    <div class="hd-right">
+      <select id="intervalSel" title="自动刷新间隔">
+        <option value="1000">1s</option>
+        <option value="2000" selected>2s</option>
+        <option value="5000">5s</option>
+        <option value="10000">10s</option>
+        <option value="0">手动</option>
+      </select>
+      <button id="btnRefresh" class="ibtn" title="立即刷新（含缓存重扫）">⟳</button>
+      <button id="btnCopy" class="ibtn" title="复制诊断简报">⧉</button>
+      <button id="btnCompact" class="ibtn" title="折叠为小窗">−</button>
+      <button id="btnCfg" class="ibtn" title="设置">⚙</button>
+    </div>
+  </header>
+
+  <div class="alert" id="alertBox" hidden><span id="alertText"></span></div>
+
+  <!-- AE 磁盘缓存 -->
+  <section class="card hero">
+    <div class="card-hd">
+      <span>AE 磁盘缓存</span>
+      <span class="pill" id="cacheVerdict">—</span>
+    </div>
+
+    <div class="hero-main">
+      <div class="hero-used">
+        <b id="cacheUsed">--</b>
+        <i id="cachePct"></i>
+      </div>
+      <div class="hero-quota">
+        <span class="lbl">上限</span>
+        <button id="quotaBtn" class="qbtn" title="点击修改缓存上限">--<em>GB</em></button>
+        <span class="qedit" id="quotaEdit" hidden>
+          <input id="quotaInput" type="number" min="1" max="4000" step="1" />
+          <button id="quotaOk" class="ibtn sm" title="确定">✓</button>
+          <button id="quotaAuto" class="ibtn sm" title="恢复自动检测">↺</button>
+        </span>
+      </div>
+    </div>
+
+    <div class="bar big"><i id="cacheBar"></i></div>
+    <div class="crate" id="cacheRate"></div>
+
+    <div class="kv">
+      <div><span>余量</span><b id="kMargin">--</b></div>
+      <div><span>剩余配额</span><b id="kLeft">--</b></div>
+      <div><span>所需空间</span><b id="kNeed">--</b></div>
+      <div><span>磁盘可用</span><b id="kFree">--</b></div>
+    </div>
+
+    <div class="pathrow">
+      <span class="path" id="cachePath" title="">正在定位缓存目录…</span>
+      <button id="btnOpen" class="ibtn sm" title="在文件管理器中打开">⌘</button>
+    </div>
+    <div class="pathrow">
+      <span class="path txt" id="otherCache" title="">其他版本缓存 查询中…</span>
+      <button id="btnOther" class="ibtn sm" title="定位其他版本的缓存目录">⌘</button>
+    </div>
+  </section>
+
+  <!-- 内存 -->
+  <section class="card">
+    <div class="gauge-row">
+      <div class="ring" id="ramRing" style="--p:0"><span id="ramPct">--</span></div>
+      <div class="gauge-side">
+        <div class="k">内存占用</div>
+        <div class="v" id="ramUsed">-- / --</div>
+        <div class="sub" id="ramFree">空闲 --</div>
+      </div>
+    </div>
+    <canvas class="spark" id="spark" height="34"></canvas>
+  </section>
+
+  <!-- 媒体缓存 -->
+  <section class="card">
+    <div class="card-hd">
+      <span>媒体缓存</span>
+      <span class="card-hd-r" id="mediaFiles"></span>
+    </div>
+    <div class="big-one" id="mediaSize">--</div>
+    <div class="pathrow">
+      <span class="path" id="mediaPath" title="">—</span>
+    </div>
+  </section>
+
+  <!-- 磁盘 -->
+  <section class="card">
+    <div class="card-hd">
+      <span>磁盘空间</span>
+      <span class="card-hd-r" id="diskSummary"></span>
+    </div>
+    <div class="disks" id="diskList"><div class="empty">正在读取…</div></div>
+  </section>
+
+  <!-- 工程 -->
+  <section class="card">
+    <div class="card-hd">
+      <span>After Effects</span>
+      <span class="card-hd-r" id="aeVer"></span>
+    </div>
+    <div class="ae-line" id="aeProject" title="">—</div>
+    <div class="ae-line dim" id="aeExtra"></div>
+  </section>
+
+  <!-- 崩溃保护 -->
+  <section class="card">
+    <div class="card-hd">
+      <span>崩溃保护</span>
+      <span class="card-hd-r" id="gdLevel">—</span>
+    </div>
+    <div class="gd-line" id="gdState">—</div>
+    <div class="gd-bar"><i id="gdBar" style="width:0%"></i></div>
+    <div class="gd-line dim" id="gdReason">—</div>
+    <div class="gd-line dim" id="gdAeSave"></div>
+    <div class="gd-line dim" id="gdSaves"></div>
+  </section>
+
+  <footer class="ft">
+    <span id="footLeft">—</span>
+    <span id="footRight"></span>
+  </footer>
+
+</div>
+
+<!-- ==================== 折叠小窗 ==================== -->
+<div class="mini" id="miniView">
+  <button class="mini-ring" id="miniRing" style="--p:0" title="点击展开">
+    <span id="miniPct">--</span>
+  </button>
+  <div class="mini-label" id="miniLabel">缓存</div>
+  <div class="mini-row">
+    <button class="ibtn sm" id="miniExpand" title="展开面板">⤢</button>
+    <button class="ibtn sm" id="miniCfg" title="设置">⚙</button>
+  </div>
+</div>
+
+<!-- ==================== 设置抽屉 ==================== -->
+<div class="mask" id="mask" hidden></div>
+<aside class="drawer" id="drawer" hidden>
+  <div class="dw-hd">
+    <span>设置</span>
+    <button class="ibtn sm" id="dwClose" title="关闭">✕</button>
+  </div>
+
+  <div class="dw-body">
+    <div class="grp">
+      <div class="grp-t">显示</div>
+      <div class="row">
+        <input type="checkbox" id="cbAuto" />
+        <label for="cbAuto">面板变窄时自动折叠</label>
+      </div>
+      <div class="row">
+        <label for="selMetric">小窗显示</label>
+        <select id="selMetric">
+          <option value="cache">缓存填充率</option>
+          <option value="mem">内存占用</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="grp-t">定时提醒</div>
+
+      <div class="row">
+        <input type="checkbox" id="cbWater" />
+        <label for="cbWater">喝水</label>
+        <input type="number" id="inWater" min="5" max="240" step="1" />
+        <span class="u">分</span>
+      </div>
+
+      <div class="row">
+        <input type="checkbox" id="cbStand" />
+        <label for="cbStand">起身活动</label>
+        <input type="number" id="inStand" min="5" max="240" step="1" />
+        <span class="u">分</span>
+      </div>
+
+      <div class="row">
+        <input type="checkbox" id="cbEyes" />
+        <label for="cbEyes">远眺护眼</label>
+        <input type="number" id="inEyes" min="5" max="240" step="1" />
+        <span class="u">分</span>
+      </div>
+
+      <div class="row">
+        <input type="checkbox" id="cbMem" />
+        <label for="cbMem">播报内存占用</label>
+        <input type="number" id="inMem" min="5" max="240" step="1" />
+        <span class="u">分</span>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="grp-t">内存偏高</div>
+
+      <div class="row">
+        <input type="checkbox" id="cbMemHigh" />
+        <label for="cbMemHigh">超过阈值时提醒</label>
+        <input type="number" id="inThr" min="50" max="99" step="1" />
+        <span class="u">%</span>
+      </div>
+
+      <div class="row">
+        <label for="inSustain">连续命中</label>
+        <input type="number" id="inSustain" min="1" max="30" step="1" />
+        <span class="u">次</span>
+      </div>
+
+      <div class="row">
+        <label for="inCool">冷却时间</label>
+        <input type="number" id="inCool" min="1" max="180" step="1" />
+        <span class="u">分</span>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="grp-t">崩溃保护</div>
+
+      <div class="row">
+        <input type="checkbox" id="cbGuard" />
+        <label for="cbGuard">风险升高时自动保存</label>
+      </div>
+
+      <div class="row">
+        <input type="checkbox" id="cbGuardWrite" />
+        <label for="cbGuardWrite">直接写入原工程</label>
+      </div>
+
+      <div class="row">
+        <input type="checkbox" id="cbSaveLog" />
+        <label for="cbSaveLog">记录每次保存（含失败原因）</label>
+      </div>
+      <div class="hint" id="logHint"></div>
+      <button class="ibtn sm logbtn" id="btnOpenLog" title="打开日志所在文件夹">打开日志文件夹</button>
+
+      <div class="row">
+        <label for="inGuardHold">最多攒</label>
+        <input type="number" id="inGuardHold" min="1" max="120" step="1" />
+        <span class="u">分</span>
+      </div>
+
+      <div class="row">
+        <label for="inGuardRisk">风险阈值</label>
+        <input type="number" id="inGuardRisk" min="40" max="100" step="5" />
+        <span class="u">分</span>
+      </div>
+
+      <div class="row">
+        <label for="inGuardCool">最小间隔</label>
+        <input type="number" id="inGuardCool" min="1" max="60" step="1" />
+        <span class="u">分</span>
+      </div>
+
+      <div class="hint">「写入原工程」等价于「文件 &gt; 保存」。未保存过的新工程永不自动写入（那会弹另存为对话框）。</div>
+    </div>
+
+    <button class="dw-reset" id="dwReset">恢复默认</button>
+  </div>
+</aside>
+
+<!-- ==================== 提醒条 ==================== -->
+<div class="remind" id="remindBar" hidden>
+  <span class="rm-ico" id="rmIco">•</span>
+  <div class="rm-txt">
+    <b id="rmTitle"></b>
+    <span id="rmMsg"></span>
+  </div>
+  <div class="rm-act">
+    <button id="rmSnooze">稍后 10 分</button>
+    <button id="rmOk">知道了</button>
+  </div>
+</div>
+
+<script src="js/ae-cache.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/reminder.js"></script>
+<script src="js/guard.js"></script>
+<script src="js/trend.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

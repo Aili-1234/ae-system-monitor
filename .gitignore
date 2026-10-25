@@ -1,0 +1,23 @@
+# 依赖与构建产物（本项目本没有）
+node_modules/
+package-lock.json
+
+# 截图工具与临时探针
+.shots/
+_probe.html
+_frame*.html
+_f*.html
+_framedrawer.html
+_zoomrow.html
+
+# 打包产物
+*.zip
+dist/
+
+# 系统垃圾
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 本地保存日志（如果被测试写到仓库里）
+saves.log

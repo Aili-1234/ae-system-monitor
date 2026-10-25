@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.sysmon.ae.panel"
+                   ExtensionBundleVersion="1.4.0" ExtensionBundleName="AE System Monitor"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <ExtensionList>
+    <Extension Id="com.sysmon.ae.panel.main" Version="1.4.0" />
+  </ExtensionList>
+
+  <ExecutionEnvironment>
+    <HostList>
+      <!-- AEFT = After Effects。
+           14.0 = CC 2017（CEP 7 + Node 6），往上到 99.9 覆盖所有未来版本。
+           低版本靠代码里的特性探测降级（无 fs.promises / 无 withFileTypes 都能跑）。 -->
+      <Host Name="AEFT" Version="[14.0,99.9]" />
+    </HostList>
+    <LocaleList>
+      <Locale Code="All" />
+    </LocaleList>
+    <RequiredRuntimeList>
+      <!-- 面板依赖 Node（内置的 require），CEP 6.1 起才有，取 7.0 更稳 -->
+      <RequiredRuntime Name="CSXS" Version="7.0" />
+    </RequiredRuntimeList>
+  </ExecutionEnvironment>
+
+  <DispatchInfoList>
+    <Extension Id="com.sysmon.ae.panel.main">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./index.html</MainPath>
+          <ScriptPath>./jsx/host.jsx</ScriptPath>
+          <CEFCommandLine>
+            <!-- 开启 Node.js：读内存 / 磁盘 / 文件大小全靠它 -->
+            <Parameter>--enable-nodejs</Parameter>
+            <Parameter>--mixed-context</Parameter>
+          </CEFCommandLine>
+        </Resources>
+
+        <Lifecycle>
+          <AutoVisible>true</AutoVisible>
+        </Lifecycle>
+
+        <UI>
+          <Type>Panel</Type>
+          <Menu>System Monitor</Menu>
+          <Geometry>
+            <Size>
+              <Height>660</Height>
+              <Width>340</Width>
+            </Size>
+            <MinSize>
+              <Height>132</Height>
+              <Width>96</Width>
+            </MinSize>
+            <MaxSize>
+              <Height>2400</Height>
+              <Width>2000</Width>
+            </MaxSize>
+          </Geometry>
+          <Icons />
+        </UI>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+</ExtensionManifest>
