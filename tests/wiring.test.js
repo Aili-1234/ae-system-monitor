@@ -18,9 +18,9 @@ const ok = (n, c, x) => { c ? pass++ : fail++; console.log(`  ${c ? 'PASS' : 'FA
 
 console.log('[1] 脚本引用与加载顺序');
 const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
-ok('引用了 6 个脚本', scripts.length === 6, scripts.join(' -> '));
+ok('引用了 7 个脚本', scripts.length === 7, scripts.join(' -> '));
 ok('每个脚本文件都存在', scripts.every(s => fs.existsSync(path.join(ROOT, s))));
-const order = ['js/ae-cache.js', 'js/settings.js', 'js/reminder.js', 'js/guard.js', 'js/trend.js', 'js/main.js'];
+const order = ['js/ae-cache.js', 'js/settings.js', 'js/reminder.js', 'js/guard.js', 'js/trend.js', 'js/backup.js', 'js/main.js'];
 ok('依赖顺序正确', JSON.stringify(scripts) === JSON.stringify(order), scripts.join(','));
 ok('guard.js 早于 main.js', scripts.indexOf('js/guard.js') < scripts.indexOf('js/main.js'));
 ok('trend.js 早于 main.js', scripts.indexOf('js/trend.js') < scripts.indexOf('js/main.js'));

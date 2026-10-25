@@ -22,13 +22,26 @@
     autoCollapse: true,      // 面板变窄时自动折叠
     miniMetric: 'cache',     // 小窗显示：cache(缓存填充率) | mem(内存占用)
     quotaGB: 0,              // 手动设定的缓存上限；0 = 自动检测（优先读 AE 偏好）
+    // 四个主项的展开状态（true = 展示细节）；默认全收起，首屏只有结论
+    ui: {
+      cache: false,
+      mem:   false,
+      disk:  false,
+      guard: false
+    },
     crashGuard: {
       on: true,              // 崩溃前自动保存总开关
       autoSave: true,        // true=写入原工程；false=只提示不动手
       holdMin: 10,           // 有改动最多积压多少分钟
       riskSave: 60,          // 风险分数达到此值立即保存
       cooldownMin: 2,        // 两次自动保存的最小间隔
-      log: true              // 把每次保存（含失败原因）写进日志文件
+      log: true,             // 把每次保存（含失败原因）写进日志文件
+      backup: true,          // 覆盖原工程前先留一份可回退的副本
+      keepBackups: 5,        // 每个工程最多留几份回退副本
+      // 档位：装好后按本机崩溃史自动选一次，之后由用户决定
+      // stable 稳定 / occasional 偶发 / frequent 高频 / quiet 安静
+      mode: 'occasional',
+      detectedAt: 0          // 上次「按本机历史检测」的时间戳；0 = 还没检测过
     },
     reminders: {
       water:   { on: true,  everyMin: 45 },
@@ -44,13 +57,23 @@
     autoCollapse: { type: 'bool' },
     miniMetric:   { type: 'enum', values: ['cache', 'mem'] },
     quotaGB:      { type: 'num', lo: 0, hi: 4000 },
+    ui: {
+      cache: { type: 'bool' },
+      mem:   { type: 'bool' },
+      disk:  { type: 'bool' },
+      guard: { type: 'bool' }
+    },
     crashGuard: {
       on:          { type: 'bool' },
       autoSave:    { type: 'bool' },
       holdMin:     { type: 'num', lo: 1,   hi: 120 },
       riskSave:    { type: 'num', lo: 40,  hi: 100 },
       cooldownMin: { type: 'num', lo: 1,   hi: 60 },
-      log:         { type: 'bool' }
+      log:         { type: 'bool' },
+      backup:      { type: 'bool' },
+      keepBackups: { type: 'num', lo: 1, hi: 20 },
+      mode:        { type: 'enum', values: ['stable', 'occasional', 'frequent', 'quiet'] },
+      detectedAt:  { type: 'num', lo: 0, hi: 4102444800000 }   // 2100-01-01
     },
     reminders: {
       water:   { on: { type: 'bool' }, everyMin: { type: 'num', lo: 5, hi: 240 } },

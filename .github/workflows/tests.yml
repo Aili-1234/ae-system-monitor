@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: 回归测试（11 组）
+      - name: 回归测试（17 组）
         shell: bash
         run: bash tools/ci-local.sh
       - name: 失败时打印整段日志（便于远程排查）
@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: 回归测试（11 组）
+      - name: 回归测试（17 组）
         shell: bash
         run: bash tools/ci-local.sh
       - name: 失败时打印整段日志（便于远程排查）

@@ -28,17 +28,18 @@
       <button id="btnRefresh" class="ibtn" title="立即刷新（含缓存重扫）">⟳</button>
       <button id="btnCopy" class="ibtn" title="复制诊断简报">⧉</button>
       <button id="btnCompact" class="ibtn" title="折叠为小窗">−</button>
-      <button id="btnCfg" class="ibtn" title="设置">⚙</button>
+      <button id="btnCfg" class="ibtn" title="设置">≡</button>
     </div>
   </header>
 
   <div class="alert" id="alertBox" hidden><span id="alertText"></span></div>
 
-  <!-- AE 磁盘缓存 -->
-  <section class="card hero">
+  <!-- ① 缓存（磁盘缓存 + 媒体缓存） -->
+  <section class="card hero" id="cardCache">
     <div class="card-hd">
-      <span>AE 磁盘缓存</span>
+      <span>缓存</span>
       <span class="pill" id="cacheVerdict">—</span>
+      <button class="tg" id="tgCache" aria-expanded="false" title="展开细节"></button>
     </div>
 
     <div class="hero-main">
@@ -51,8 +52,8 @@
         <button id="quotaBtn" class="qbtn" title="点击修改缓存上限">--<em>GB</em></button>
         <span class="qedit" id="quotaEdit" hidden>
           <input id="quotaInput" type="number" min="1" max="4000" step="1" />
-          <button id="quotaOk" class="ibtn sm" title="确定">✓</button>
-          <button id="quotaAuto" class="ibtn sm" title="恢复自动检测">↺</button>
+          <button id="quotaOk" class="ibtn sm" title="确定">√</button>
+          <button id="quotaAuto" class="ibtn sm" title="恢复自动检测">自</button>
         </span>
       </div>
     </div>
@@ -60,78 +61,94 @@
     <div class="bar big"><i id="cacheBar"></i></div>
     <div class="crate" id="cacheRate"></div>
 
-    <div class="kv">
-      <div><span>余量</span><b id="kMargin">--</b></div>
-      <div><span>剩余配额</span><b id="kLeft">--</b></div>
-      <div><span>所需空间</span><b id="kNeed">--</b></div>
-      <div><span>磁盘可用</span><b id="kFree">--</b></div>
-    </div>
-
-    <div class="pathrow">
-      <span class="path" id="cachePath" title="">正在定位缓存目录…</span>
-      <button id="btnOpen" class="ibtn sm" title="在文件管理器中打开">⌘</button>
-    </div>
-    <div class="pathrow">
-      <span class="path txt" id="otherCache" title="">其他版本缓存 查询中…</span>
-      <button id="btnOther" class="ibtn sm" title="定位其他版本的缓存目录">⌘</button>
+    <div class="card-body" id="bdCache">
+      <div class="kv">
+        <div><span>余量</span><b id="kMargin">--</b></div>
+        <div><span>剩余配额</span><b id="kLeft">--</b></div>
+        <div><span>所需空间</span><b id="kNeed">--</b></div>
+        <div><span>磁盘可用</span><b id="kFree">--</b></div>
+      </div>
+      <div class="pathrow">
+        <span class="path" id="cachePath" title="">正在定位缓存目录…</span>
+        <button id="btnOpen" class="ibtn sm" title="在文件管理器中打开">↗</button>
+      </div>
+      <div class="pathrow">
+        <span class="path txt" id="otherCache" title="">其他版本缓存 查询中…</span>
+        <button id="btnOther" class="ibtn sm" title="定位其他版本的缓存目录">↗</button>
+      </div>
+      <div class="pathrow">
+        <span class="path txt" id="prefsSrc" title="">—</span>
+      </div>
+      <div class="pathrow">
+        <span class="path txt" id="mediaHint">媒体缓存</span>
+        <b class="mini-num" id="mediaSize">--</b>
+        <i class="mini-sub" id="mediaFiles"></i>
+      </div>
+      <div class="pathrow">
+        <span class="path txt" id="mediaPath" title="">—</span>
+      </div>
     </div>
   </section>
 
-  <!-- 内存 -->
-  <section class="card">
+  <!-- ② 内存 -->
+  <section class="card" id="cardMem">
+    <div class="card-hd">
+      <span>内存</span>
+      <button class="tg" id="tgMem" aria-expanded="false" title="展开细节"></button>
+    </div>
     <div class="gauge-row">
       <div class="ring" id="ramRing" style="--p:0"><span id="ramPct">--</span></div>
       <div class="gauge-side">
-        <div class="k">内存占用</div>
         <div class="v" id="ramUsed">-- / --</div>
         <div class="sub" id="ramFree">空闲 --</div>
       </div>
     </div>
-    <canvas class="spark" id="spark" height="34"></canvas>
-  </section>
-
-  <!-- 媒体缓存 -->
-  <section class="card">
-    <div class="card-hd">
-      <span>媒体缓存</span>
-      <span class="card-hd-r" id="mediaFiles"></span>
-    </div>
-    <div class="big-one" id="mediaSize">--</div>
-    <div class="pathrow">
-      <span class="path" id="mediaPath" title="">—</span>
+    <div class="card-body" id="bdMem">
+      <canvas class="spark" id="spark" height="34"></canvas>
+      <div class="kv">
+        <div><span>提交内存</span><b id="memCommit">--</b></div>
+        <div><span>可用内存</span><b id="memFree">--</b></div>
+      </div>
     </div>
   </section>
 
-  <!-- 磁盘 -->
-  <section class="card">
+  <!-- ③ 磁盘 -->
+  <section class="card" id="cardDisk">
     <div class="card-hd">
-      <span>磁盘空间</span>
+      <span>磁盘</span>
       <span class="card-hd-r" id="diskSummary"></span>
+      <button class="tg" id="tgDisk" aria-expanded="false" title="展开细节"></button>
     </div>
-    <div class="disks" id="diskList"><div class="empty">正在读取…</div></div>
+    <div class="card-body" id="bdDisk">
+      <div class="disks" id="diskList"><div class="empty">正在读取…</div></div>
+    </div>
   </section>
 
-  <!-- 工程 -->
-  <section class="card">
+  <!-- ④ 保护（崩溃保护 + 工程信息） -->
+  <section class="card" id="cardGuard">
     <div class="card-hd">
-      <span>After Effects</span>
-      <span class="card-hd-r" id="aeVer"></span>
-    </div>
-    <div class="ae-line" id="aeProject" title="">—</div>
-    <div class="ae-line dim" id="aeExtra"></div>
-  </section>
-
-  <!-- 崩溃保护 -->
-  <section class="card">
-    <div class="card-hd">
-      <span>崩溃保护</span>
+      <span>保护</span>
       <span class="card-hd-r" id="gdLevel">—</span>
+      <button class="tg" id="tgGuard" aria-expanded="false" title="展开细节"></button>
     </div>
+
     <div class="gd-line" id="gdState">—</div>
-    <div class="gd-bar"><i id="gdBar" style="width:0%"></i></div>
-    <div class="gd-line dim" id="gdReason">—</div>
-    <div class="gd-line dim" id="gdAeSave"></div>
-    <div class="gd-line dim" id="gdSaves"></div>
+
+    <div class="card-body" id="bdGuard">
+      <div class="gd-bar"><i id="gdBar" style="width:0%"></i></div>
+      <div class="gd-line dim" id="gdReason">—</div>
+      <div class="gd-line dim" id="gdCrash"></div>
+      <div class="gd-line dim" id="gdAeSave"></div>
+      <div class="gd-line dim" id="gdSaves"></div>
+      <div class="pathrow">
+        <span class="path txt" id="bkHint">回退副本 查询中…</span>
+        <button id="btnBkOpen" class="ibtn sm" title="打开备份文件夹">↗</button>
+        <button id="btnBkRestore" class="ibtn sm" title="取回最近一份（生成副本，不动原文件）">↺</button>
+      </div>
+      <div class="ae-line" id="aeProject" title="">—</div>
+      <div class="ae-line dim" id="aeExtra"></div>
+      <div class="ae-line dim" id="aeVer"></div>
+    </div>
   </section>
 
   <footer class="ft">
@@ -148,8 +165,8 @@
   </button>
   <div class="mini-label" id="miniLabel">缓存</div>
   <div class="mini-row">
-    <button class="ibtn sm" id="miniExpand" title="展开面板">⤢</button>
-    <button class="ibtn sm" id="miniCfg" title="设置">⚙</button>
+    <button class="ibtn sm" id="miniExpand" title="展开面板">↗</button>
+    <button class="ibtn sm" id="miniCfg" title="设置">≡</button>
   </div>
 </div>
 
@@ -236,6 +253,18 @@
       <div class="grp-t">崩溃保护</div>
 
       <div class="row">
+        <label for="selGuardMode">档位</label>
+        <select id="selGuardMode">
+          <option value="stable">稳定（很少崩）</option>
+          <option value="occasional">偶发（每周左右）</option>
+          <option value="frequent">高频（几乎每天崩）</option>
+          <option value="quiet">安静（尽量别打扰）</option>
+        </select>
+      </div>
+      <div class="hint" id="modeHint"></div>
+      <button class="ibtn sm logbtn" id="btnGuardDetect" title="读本机 WER 的崩溃记录，自动选一档">按本机崩溃史重新检测</button>
+
+      <div class="row">
         <input type="checkbox" id="cbGuard" />
         <label for="cbGuard">风险升高时自动保存</label>
       </div>
@@ -251,6 +280,16 @@
       </div>
       <div class="hint" id="logHint"></div>
       <button class="ibtn sm logbtn" id="btnOpenLog" title="打开日志所在文件夹">打开日志文件夹</button>
+
+      <div class="row">
+        <input type="checkbox" id="cbBackup" />
+        <label for="cbBackup">覆盖前留回退副本</label>
+      </div>
+      <div class="row">
+        <label for="inKeep">保留</label>
+        <input type="number" id="inKeep" min="1" max="20" step="1" />
+        <span class="u">份</span>
+      </div>
 
       <div class="row">
         <label for="inGuardHold">最多攒</label>
@@ -295,6 +334,7 @@
 <script src="js/reminder.js"></script>
 <script src="js/guard.js"></script>
 <script src="js/trend.js"></script>
+<script src="js/backup.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

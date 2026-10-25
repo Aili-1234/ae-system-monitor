@@ -48,26 +48,44 @@ ok('roundtrip 保留上限', rt.quotaGB === 320, rt.quotaGB);
 ok('roundtrip 保留开关', rt.crashGuard.log === false);
 
 console.log('\n[4] 其他版本缓存目录');
-const prefs = AE.loadPrefs();
-if (!prefs) {
-  console.log('  SKIP  本机无 AE 偏好，跳过');
-} else {
-  const cur = AE.resolveCacheDir(prefs.folder, AE.verShort(prefs.ver));
-  const others = AE.otherVersionCacheDirs(prefs.folder, cur);
-  console.log('  当前: ' + cur);
-  others.forEach(p => console.log('  其他: ' + p));
+{
+  /* 用 fixture 造两套 AE 的缓存目录，**不依赖本机装没装 AE**。
+     原来这里直接 loadPrefs()，在 CI runner 上读不到偏好就整组 SKIP，
+     于是 6 条断言在两个平台上的数量对不齐（本机 429 / runner 423）。
+     现在改成 fixture：本机与 runner 跑出来的数字必须完全一致。 */
+  const F = require('./_fixture');
+  const fx = F.makeFixture({ files: 3, sizeEach: 512 });
 
-  ok('返回数组', Array.isArray(others), others.length + ' 个');
-  ok('不包含当前目录',
-     others.every(p => p.toLowerCase() !== String(cur).toLowerCase()));
-  ok('返回的目录都真实存在', others.every(p => fs.existsSync(p)));
-  ok('去重（同一路径只出现一次）',
-     new Set(others.map(p => p.toLowerCase())).size === others.length);
-  ok('名字都像缓存目录', others.every(p => /Disk Cache/i.test(path.basename(p))));
+  try {
+    const AEf = AECache.create({ fs, os: fx.osStub, path, Buffer });
+    const prefs = AEf.loadPrefs();
+    if (!prefs) throw new Error('fixture 没造出可读的偏好，检查 _fixture.js');
 
-  // 本机装了两套 AE，应当能看见另一套的缓存；看不到也不能算失败（可能已被清理）
-  if (others.length) ok('其他版本缓存合计可被扫描', true, others.length + ' 个目录');
-  else console.log('  INFO  未发现其他版本缓存（可能只有当前版本或已清理）');
+    const cur = AEf.resolveCacheDir(prefs.folder, AEf.verShort(prefs.ver));
+
+    // 再造一套「更老版本」的缓存目录，用来验证它会被枚举到、且当前目录不会被算进去
+    const oldVer = '23.0';
+    const oldDir = path.join(prefs.folder, 'Adobe', 'After Effects', oldVer,
+                             'Disk Cache - ' + fx.host + '.noindex');
+    fs.mkdirSync(oldDir, { recursive: true });
+    fs.writeFileSync(path.join(oldDir, 'chunk.aecache'), Buffer.alloc(64, 0x41));
+
+    const others = AEf.otherVersionCacheDirs(prefs.folder, cur);
+    console.log('  当前: ' + cur);
+    others.forEach(p => console.log('  其他: ' + p));
+
+    ok('枚举到那套更老版本的缓存', others.length === 1, others.length + ' 个');
+    ok('去重（同一路径只出现一次）',
+       new Set(others.map(p => p.toLowerCase())).size === others.length);
+    ok('不包含当前目录',
+       others.every(p => p.toLowerCase() !== String(cur).toLowerCase()));
+    ok('返回的目录都真实存在', others.every(p => fs.existsSync(p)));
+    ok('名字都像缓存目录', others.every(p => /Disk Cache/i.test(path.basename(p))));
+    ok('路径里带的是 23.0 而不是当前版本',
+       others.length === 1 && /23\.0/.test(others[0]), others[0] || '');
+  } finally {
+    fx.cleanup();
+  }
 }
 
 console.log('\n[5] 异常输入不崩');

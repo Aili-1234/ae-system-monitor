@@ -13,13 +13,14 @@
   'use strict';
 
   /* ---------------- 运行环境 ---------------- */
-  var os = null, execSync = null, fs = null, pathmod = null, Buffer_ = null;
+  var os = null, execSync = null, exec = null, fs = null, pathmod = null, Buffer_ = null;
   var hasNode = false;
   var hasCEP = !!window.__adobe_cep__;
 
   try {
     os = require('os');
     execSync = require('child_process').execSync;
+    exec = require('child_process').exec;
     fs = require('fs');
     pathmod = require('path');
     Buffer_ = require('buffer').Buffer;
@@ -73,6 +74,13 @@
     ae: null,
     projectPath: '',
     prefs: null,
+    prefsFor: '',             // 上面那份偏好是为哪个运行版本读的（'' = 还没拿到 app.version）
+    commitPct: NaN,           // 提交内存占用率（%）；NaN = 还没取到
+    commitAt: 0,
+    commitBusy: false,
+    crash: null,              // 最近一次 AE 崩溃 { hoursAgo, code, codeText, module, time }
+    crashProfile: null,       // 本机崩溃画像 { count30, count7, medianGapH, tier, ... }
+    crashAt: 0,
     lastAt: null,
     busy: false,
     quotaOverride: null,
@@ -80,6 +88,7 @@
 
     cache: {
       path: '', prefsPath: '', prefFolder: '', prefQuotaGB: 0,
+      prefsVer: '', prefsMatched: null, runVer: '',
       enabled: true, bufferGB: CFG.defaultBufferGB,
       used: 0, files: 0, scanned: 0, truncated: false,
       drive: '', driveFreeGB: NaN, driveTotalGB: NaN,
@@ -95,7 +104,8 @@
     guardRev: 0,              // 上次保存时的 revision（dirty 取不到时的兜底基线）
     guard: {
       risk: 0, level: 'ok', reasons: [], blocked: '', suggest: false,
-      saved: 0, savedAt: 0, lastErr: '', saving: false, saveMs: 0
+      saved: 0, savedAt: 0, lastErr: '', saving: false, saveMs: 0,
+      lastBackup: '', backupErr: ''
     },
     autoSave: null,           // AE 自带自动保存配置
     lastAutoSaved: null,      // 自动保存目录里最新的文件
@@ -111,6 +121,7 @@
   var Reminder = window.SysmonReminder || null;
   var Guard = window.SysmonGuard || null;
   var Trend = window.SysmonTrend || null;
+  var Backup = window.SysmonBackup || null;
 
   var CFG_KEY = 'sysmon.cfg';
   var USR = null;             // 归一化后的用户设置
@@ -448,6 +459,14 @@
       if (!Array.isArray(a)) return;
       ST.cacheHist = a.filter(function (p) {
         return p && isFinite(p.t) && isFinite(p.b) && p.b >= 0;
+      }).map(function (p) {
+        // 老版本的历史点没有 m（余量），统一补 null：marginRate 会跳过它们并退回旧算法
+        var m = Number(p.m);
+        return {
+          t: Number(p.t),
+          b: Number(p.b),
+          m: (p.m === null || p.m === undefined || !isFinite(m)) ? null : m
+        };
       });
     } catch (e) { ST.cacheHist = []; }
   }
@@ -468,7 +487,10 @@
     if (!c.used && !c.files) return;
 
     var before = ST.cacheHist.length;
-    Trend.push(ST.cacheHist, Date.now(), c.used);
+    // 同时记下余量：ETA 用余量的斜率算，缓存斜率只用来解释原因
+    Trend.push(ST.cacheHist, Date.now(), c.used, {
+      marginGB: isFinite(c.marginGB) ? c.marginGB : null
+    });
     if (ST.cacheHist.length !== before) saveHist();
   }
 
@@ -486,7 +508,8 @@
       c.quotaSrc = '手动设定';
     } else if (c.prefQuotaGB > 0) {
       c.quotaGB = c.prefQuotaGB;
-      c.quotaSrc = 'AE 首选项';
+      c.quotaSrc = (c.prefsVer ? 'AE ' + c.prefsVer + ' 首选项' : 'AE 首选项') +
+                   (c.prefsMatched === false ? '（版本不匹配，可能不准）' : '');
     } else if (isFinite(c.driveTotalGB)) {
       // Adobe 文档：默认 = 卷容量的 10%，上限 100 GB
       c.quotaGB = Math.min(c.driveTotalGB * 0.10, 100);
@@ -574,6 +597,30 @@
       pEl.title = c.prefFolder || '';
     }
 
+    // 这份数字是从哪个版本的首选项读来的？
+    // 版本错配时数字会「看起来更安全」（配额偏大→填充率偏低→余量偏高），
+    // 静默发生比报错更糟，所以必须写在面板上，而不是塞进 tooltip。
+    var psEl = $('prefsSrc');
+    if (psEl) {
+      var txt, warn = false, tip = '';
+      if (!ST.prefs) {
+        txt = '未找到 AE 首选项';
+        warn = true;
+        tip = '让 AE 打开一次「首选项 → 媒体和磁盘缓存」并确定，偏好文件才会写出来';
+      } else if (c.prefsMatched === false) {
+        txt = '未找到 ' + (c.runVer || '当前版本') + ' 首选项，暂用 ' +
+              (c.prefsVer || '其它版本') + '（配额可能不准）';
+        warn = true;
+        tip = ST.prefs.path;
+      } else {
+        txt = '来源：' + (c.quotaSrc || ('AE ' + (c.prefsVer || '') + ' 首选项'));
+        tip = ST.prefs.path;
+      }
+      psEl.textContent = txt;
+      psEl.title = tip;
+      if (warn) psEl.classList.add('warn'); else psEl.classList.remove('warn');
+    }
+
     var rt = $('cacheRate');
     if (rt) {
       if (!Trend) {
@@ -581,8 +628,9 @@
       } else {
         var d = Trend.describe(ST.cacheHist, c.marginGB);
         rt.textContent = d.text;
-        rt.className = 'crate' + (d.level === 'warn' ? ' warn' : '');
-        rt.title = '按最近 2 小时的采样估算；缓存被 AE 清理后会显示回落';
+        rt.className = 'crate' + (d.level === 'bad' ? ' bad' : d.level === 'warn' ? ' warn' : '');
+        rt.title = '按最近 2 小时的采样估算：ETA 用「余量」的斜率，' +
+                   '缓存斜率只用来判断是不是缓存在吃盘';
       }
     }
 
@@ -611,6 +659,12 @@
 
     $('ramUsed').textContent = fmtBytes(m.used) + ' / ' + fmtBytes(m.total);
     $('ramFree').textContent = '空闲 ' + fmtBytes(m.free);
+
+    // 展开区的两项：提交内存是 AE 分配失败的关键，别藏在 tooltip 里
+    var ce = $('memCommit');
+    if (ce) ce.textContent = isFinite(ST.commitPct) ? ST.commitPct.toFixed(0) + '%' : '--';
+    var fe = $('memFree');
+    if (fe) fe.textContent = fmtBytes(m.free);
 
     renderMini();
   }
@@ -915,9 +969,15 @@
       projDirty: dirty,
       renderActive: p.rq === 1,
       memPct: m ? m.pct : null,
+      // 提交内存才是内存侧的主信号：AE 的 "Unable to allocate" 撞的是提交上限
+      commitPct: isFinite(ST.commitPct) ? ST.commitPct : null,
       marginGB: isFinite(c.marginGB) ? c.marginGB : null,
       cacheFillPct: c.fillPct || 0,
-      hostAlive: p.alive
+      hostAlive: p.alive,
+      // 最近一次 AE 崩溃距今几小时（null = 没有记录）
+      crashHoursAgo: (ST.crash && isFinite(ST.crash.hoursAgo)) ? ST.crash.hoursAgo : null,
+      // 本机崩溃画像：档位用它、界面也用它解释"为什么是这个档"
+      crashProfile: ST.crashProfile || null
     };
   }
 
@@ -981,6 +1041,12 @@
       renderGuard();
     }
 
+    // 覆盖前先留一份可回退的副本。失败也继续保存 —— 覆盖优先，不能因为备份问题丢掉改动
+    var bk = null;
+    try { bk = makeBackup(ST.projectPath); } catch (e) { bk = null; }
+    ST.guard.lastBackup = (bk && bk.ok) ? bk.path : '';
+    ST.guard.backupErr = (bk && !bk.ok && !bk.skipped) ? (bk.err || '备份失败') : '';
+
     try {
       window.__adobe_cep__.evalScript('sysmon_save()', function (raw) {
         finish(parseKV(raw));
@@ -994,20 +1060,120 @@
   /* ---------------- 保存日志 ----------------
      崩溃保护唯一的验收方式是「它到底替我存过没有」。只弹一条 toast 等于没记录：
      面板一关就失忆。这里落一份纯文本日志，行格式固定，方便用户直接打开看。 */
-  function saveLogPath() {
+  function localDataDir() {
     if (!hasNode) return '';
     try {
       var home = os.homedir();
-      var dir = process.platform === 'win32'
+      return process.platform === 'win32'
         ? pathmod.join(home, 'AppData', 'Local', 'AESystemMonitor')
         : (process.platform === 'darwin'
             ? pathmod.join(home, 'Library', 'Logs', 'AESystemMonitor')
             : pathmod.join(home, '.cache', 'AESystemMonitor'));
-      return pathmod.join(dir, 'saves.log');
     } catch (e) { return ''; }
   }
 
+  function saveLogPath() {
+    var dir = localDataDir();
+    return dir ? pathmod.join(dir, 'saves.log') : '';
+  }
+
   function logEnabled() { return !!(USR && USR.crashGuard && USR.crashGuard.log); }
+
+  /* ---------------- 回退副本 ----------------
+     保护保存写的是原工程文件，覆盖之后就回不去。所以写盘前先 copy 一份带时间戳的副本。
+     三条原则：
+       · 覆盖优先：备份失败不能阻止保存 —— 宁可没有副本，也不能丢改动。
+       · 回退不做原地覆盖：AE 正开着工程时替换文件，内存里的内容一保存就把回退盖掉了。
+         所以「取回」是生成一份新文件，让人在 AE 里主动打开比对。
+       · 份数有上限：大工程每份几百 MB，不设上限很快占满盘。 */
+  function backupEnabled() {
+    return !!(Backup && USR && USR.crashGuard && USR.crashGuard.backup);
+  }
+
+  function backupRoot() {
+    var dir = localDataDir();
+    return dir ? pathmod.join(dir, 'backup') : '';
+  }
+
+  function backupDirFor(projectPath) {
+    var root = backupRoot();
+    if (!root || !Backup || !projectPath) return '';
+    return pathmod.join(root, Backup.folderFor(projectPath));
+  }
+
+  function mkdirp(dir) {
+    try {
+      if (!dir || fs.existsSync(dir)) return;
+      var parts = String(dir).split(/[\\/]/);
+      var cur = parts[0];
+      for (var i = 1; i < parts.length; i++) {
+        if (!parts[i]) continue;
+        cur = pathmod.join(cur, parts[i]);
+        if (!fs.existsSync(cur)) fs.mkdirSync(cur);
+      }
+    } catch (e) {}
+  }
+
+  /* 最新在前：文件名里带时间戳，字典序倒排即时间倒排 */
+  function listBackups(projectPath) {
+    var dir = backupDirFor(projectPath);
+    if (!dir || !fs || !fs.existsSync(dir)) return [];
+    var out = [];
+    try {
+      fs.readdirSync(dir).forEach(function (n) {
+        if (!/\.aepx?$/i.test(n)) return;
+        var p = pathmod.join(dir, n);
+        var st = null;
+        try { st = fs.statSync(p); } catch (e) { return; }
+        out.push({ name: n, path: p, size: st.size, mtime: st.mtimeMs });
+      });
+    } catch (e) {}
+    out.sort(function (a, b) { return a.name < b.name ? 1 : -1; });
+    return out;
+  }
+
+  /* 写盘前留一份。返回 { ok, path } 或 { ok:false, err/skipped } */
+  function makeBackup(projectPath) {
+    if (!backupEnabled() || !hasNode || !fs || !projectPath) return { ok: false, skipped: true };
+    try {
+      if (!fs.existsSync(projectPath)) return { ok: false, err: '工程文件不存在' };
+      var dir = backupDirFor(projectPath);
+      if (!dir) return { ok: false, skipped: true };
+      mkdirp(dir);
+
+      var dest = pathmod.join(dir, Backup.backupName(projectPath, Date.now()));
+      fs.copyFileSync(projectPath, dest);
+
+      // 轮转：只留最近 keep 份
+      var keepN = (USR.crashGuard && USR.crashGuard.keepBackups) || 5;
+      var names = listBackups(projectPath).map(function (b) { return b.name; });
+      Backup.rotate(names, keepN).remove.forEach(function (n) {
+        try { fs.unlinkSync(pathmod.join(dir, n)); } catch (e) {}
+      });
+
+      return { ok: true, path: dest };
+    } catch (e) {
+      return { ok: false, err: e.message || String(e) };
+    }
+  }
+
+  /* 取回最近一份：生成「（回退 时间）」副本，不动原文件 */
+  function restoreLatest() {
+    if (!Backup || !hasNode || !ST.projectPath) { toast('先打开一个已保存的工程'); return; }
+    var list = listBackups(ST.projectPath);
+    if (!list.length) { toast('还没有回退副本（下次保护保存时生成）'); return; }
+
+    var dir = pathmod.dirname(ST.projectPath);
+    var dest = pathmod.join(dir, Backup.restoreName(ST.projectPath, Date.now()));
+    try {
+      if (fs.existsSync(dest)) { toast('同名回退副本已存在，稍后再试'); return; }
+      fs.copyFileSync(list[0].path, dest);
+      toast('已生成回退副本：' + pathmod.basename(dest));
+      openFolder(dir);
+    } catch (e) {
+      toast('取回失败：' + (e.message || e));
+    }
+  }
 
   function pad2(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -1132,7 +1298,84 @@
       as.textContent = '';
     }
 
+    // 崩溃史：既是「为什么现在保存更勤」的解释，也是排查线索。
+    // 档位放在最前面，因为它是判定参数的来源 —— 看到「高频」就明白为什么阈值低。
+    var cs = $('gdCrash');
+    if (cs) {
+      var c = ST.crash;
+      var pf = ST.crashProfile;
+      var mode = (USR && USR.crashGuard) ? USR.crashGuard.mode : 'occasional';
+      var M = (Guard && Guard.MODES[mode]) ? Guard.MODES[mode] : null;
+      var bits = [];
+
+      if (M) bits.push('档位 ' + M.label);
+      if (pf && isFinite(pf.count30)) bits.push('30 天 ' + pf.count30 + ' 次');
+
+      if (c && c.time) {
+        var kind = c.type === 'hang' ? '无响应' : '崩溃';
+        var t2 = '上次' + kind + ' ' + agoText(c.time);
+        if (c.codeText) t2 += '（' + c.codeText + '）';
+        else if (c.code) t2 += '（' + c.code + '）';
+        if (M && c.hoursAgo <= M.dayH) {
+          t2 += (c.hoursAgo <= M.hotH) ? ' · 刚崩过' : ' · 近期崩过';
+        }
+        bits.push(t2);
+      }
+
+      if (!bits.length) {
+        cs.textContent = '本机无崩溃记录';
+      } else {
+        cs.textContent = bits.join(' · ');
+      }
+      cs.className = 'gd-line dim' + (c && M && c.hoursAgo <= M.hotH ? ' high' : '');
+      cs.title = (c && c.dir ? c.dir : '') +
+                 (c && c.module ? '\n故障模块：' + c.module : '') +
+                 (pf && isFinite(pf.medianGapH) ? '\n本机平均间隔：' + Math.round(pf.medianGapH) + ' 小时' : '');
+    }
+
     renderSaves();
+    renderBackup();
+  }
+
+  /* 回退副本：只报「有几份、最近一次」，不摊开列表 —— 列表在文件夹里看更实在 */
+  function renderBackup() {
+    var el = $('bkHint');
+    if (!el) return;
+
+    var bo = $('btnBkOpen'), br = $('btnBkRestore');
+
+    if (!Backup || !hasNode) {
+      el.textContent = '回退副本：需要 Node 环境';
+      if (bo) bo.hidden = true;
+      if (br) br.hidden = true;
+      return;
+    }
+    if (bo) bo.hidden = false;
+    if (br) br.hidden = false;
+
+    if (!backupEnabled()) {
+      el.textContent = '回退副本已关闭（设置里可开）';
+      if (br) br.hidden = true;
+      return;
+    }
+    if (!ST.projectPath) {
+      el.textContent = '回退副本：打开一个已保存的工程后可用';
+      if (br) br.hidden = true;
+      el.title = '';
+      return;
+    }
+
+    var list = listBackups(ST.projectPath);
+    if (!list.length) {
+      el.textContent = '回退副本：暂无（下次保护保存时生成）';
+      el.title = backupDirFor(ST.projectPath) || '';
+    } else {
+      el.textContent = '回退副本 ' + list.length + ' 份 · 最近 ' + agoText(list[0].mtime);
+      el.title = list.slice(0, 8).map(function (b) {
+        return stamp(b.mtime) + '　' + fmtBytes(b.size);
+      }).join('\n');
+    }
+    if (ST.guard.backupErr) el.textContent += ' · 上次备份失败：' + ST.guard.backupErr;
   }
 
   /* 保存日志那一行：最近几次保存 + 日志文件位置（鼠标悬停看全文） */
@@ -1340,9 +1583,65 @@
     c.prefQuotaGB = ST.prefs.maxSizeGB;
     c.enabled = ST.prefs.enabled;
     c.bufferGB = ST.prefs.bufferGB;
+    c.prefsVer = ST.prefs.ver || '';
+    c.prefsMatched = (ST.prefs.verMatched === undefined) ? null : ST.prefs.verMatched;
+    c.runVer = ST.prefs.runVer || AE.verShort(ST.ae && ST.ae.v) || '';
 
-    var ver = AE.verShort(ST.ae && ST.ae.v) || ST.prefs.ver;
-    c.path = AE.resolveCacheDir(ST.prefs.folder, ver);
+    // 缓存目录跟着「运行中的版本」走（每个版本的 AE 各写各的目录）。
+    // 先 strict 只认精确目录：两个版本都装着时，resolveCacheDir 的深度兜底
+    // 会挑「最近改动」的那个，而那很可能是另一个版本的。
+    var runVer = AE.verShort(ST.ae && ST.ae.v) || '';
+    var prefVer = ST.prefs.ver || '';
+    var p = '';
+
+    if (runVer) p = AE.resolveCacheDir(ST.prefs.folder, runVer, { strict: true });
+    if (!p && prefVer && prefVer !== runVer) {
+      p = AE.resolveCacheDir(ST.prefs.folder, prefVer, { strict: true });
+    }
+    if (!p) p = AE.resolveCacheDir(ST.prefs.folder, runVer || prefVer);  // 放手走兜底
+
+    c.path = p;
+  }
+
+  /* ---------------- 提交内存（仅 Windows） ----------------
+     AE 报 "Unable to allocate XXX MB of memory" 时，撞的是提交上限（commit limit），
+     不是物理内存余量 —— 社区里 128 GB 的机器在内存只用 40% 时照样每 20 分钟报这个错。
+     这是 Node 读不到的数，只能问系统：60 秒一次、异步执行、失败就保留上次读数。 */
+  function updateCommit(force) {
+    if (!hasNode || !exec || typeof process === 'undefined' || process.platform !== 'win32') return;
+    if (ST.commitBusy) return;
+    if (!force && ST.commitAt && Date.now() - ST.commitAt < 60000) return;
+
+    ST.commitBusy = true;
+
+    var ps = '@(Get-CimInstance Win32_OperatingSystem | ' +
+             'Select-Object TotalVirtualMemorySize,FreeVirtualMemory) | ConvertTo-Json -Compress';
+    var cmd = 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' + ps + '"';
+
+    var done = false;
+    function finish(v) {
+      if (done) return;
+      done = true;
+      ST.commitBusy = false;
+      ST.commitAt = Date.now();          // 失败也记时间，避免每轮都 spawn 一次
+      if (isFinite(v)) ST.commitPct = v;
+    }
+
+    try {
+      exec(cmd, { windowsHide: true, timeout: 8000 }, function (err, stdout) {
+        if (err) { finish(NaN); return; }
+        try {
+          var o = JSON.parse(String(stdout || '').replace(/^\uFEFF/, '').trim());
+          if (Array.isArray(o)) o = o[0];
+          var lim = Number(o.TotalVirtualMemorySize);
+          var free = Number(o.FreeVirtualMemory);
+          if (!(lim > 0) || !isFinite(free)) { finish(NaN); return; }
+          finish((1 - free / lim) * 100);
+        } catch (e) { finish(NaN); }
+      });
+    } catch (e) { finish(NaN); }
+
+    setTimeout(function () { finish(NaN); }, 9000);   // 兜底：别让 busy 卡死
   }
 
   function refresh(force) {
@@ -1358,6 +1657,7 @@
       if (ST.hist.length > CFG.histMax) ST.hist.shift();
     }
     updateDisks(force);           // 带 TTL 与失败保留，失败时沿用上次有效读数
+    updateCommit(force);          // 提交内存：AE 分配失败看的是它，不是物理余量
 
     renderMem();
     drawSpark();
@@ -1387,10 +1687,21 @@
       renderRenderBadge();
       startTimer();     // 渲染开始/结束时切到对应间隔（内部只在间隔变了才真的重设）
 
-      if (!ST.prefs && AE) ST.prefs = AE.loadPrefs();
+      // 偏好必须与「运行中的版本」对齐，且版本一变就重读。
+      // 同时开两个 AE 版本时，用户切过去而面板还在跑：不重读就会一直用错的那份。
+      // runVer 为空（这一拍没问到 AE）时不动，避免心跳抖动导致来回重读。
+      var runVer = (AE && info) ? AE.verShort(info.v) : '';
+      if (AE && (!ST.prefs || (runVer && ST.prefsFor !== runVer))) {
+        ST.prefs = AE.loadPrefs(info ? info.v : '');
+        ST.prefsFor = runVer;
+        ST.cache.path = '';        // 版本变了，缓存目录必须重新定位
+        ST.cache.error = '';
+        ST.autoSave = null;        // 自动保存配置也是按版本存的
+        ST.lastAutoSaved = null;
+        ST.lastAutoSavedAt = 0;
+      }
       deriveCachePath();
 
-      // AE 自带的自动保存配置在另一份偏好文件里，只需要读一次
       if (!ST.autoSave && AE) {
         ST.autoSave = AE.loadAutoSavePrefs(ST.prefs ? ST.prefs.ver : null);
       }
@@ -1398,6 +1709,15 @@
       if (AE && ST.autoSave && (Date.now() - ST.lastAutoSavedAt > 60000)) {
         ST.lastAutoSaved = AE.latestAutoSave(ST.autoSave.folder);
         ST.lastAutoSavedAt = Date.now();
+      }
+
+      // 最近一次崩溃 + 本机崩溃画像：5 分钟看一次就够（这个事实不会瞬变）
+      if (AE && AE.crashHistory && (Date.now() - ST.crashAt > 300000)) {
+        var hist = null;
+        try { hist = AE.crashHistory(); } catch (e) { hist = null; }
+        ST.crashProfile = hist;
+        ST.crash = hist ? hist.last : null;
+        ST.crashAt = Date.now();
       }
 
       computeMetrics();
@@ -1486,6 +1806,7 @@
       L.push('内存    : ' + fmtBytes(ST.mem.used) + ' / ' + fmtBytes(ST.mem.total) +
              '（' + ST.mem.pct.toFixed(1) + '%）');
     }
+    L.push('提交内存: ' + (isFinite(ST.commitPct) ? ST.commitPct.toFixed(1) + '%' : '读取不到'));
     ST.disks.forEach(function (d) {
       L.push('磁盘 ' + d.name + ': ' + fmtBytes(d.free) + ' 可用 / ' + fmtBytes(d.total));
     });
@@ -1500,6 +1821,27 @@
                                    : g.savedAt ? '已于 ' + hhmmss(g.savedAt) + ' 自动保存（累计 ' + g.saved + ' 次）'
                                    : '本次会话尚未触发'));
     L.push('跳过原因: ' + ((Guard && Guard.BLOCK_LABELS[g.blocked]) || '无'));
+    L.push('档位    : ' + ((Guard && Guard.MODES[USR.crashGuard.mode])
+      ? Guard.MODES[USR.crashGuard.mode].label + '（最多攒 ' + USR.crashGuard.holdMin +
+        ' 分钟 / 阈值 ' + USR.crashGuard.riskSave + ' 分）'
+      : USR.crashGuard.mode));
+    L.push('崩溃史  : ' + (ST.crashProfile && isFinite(ST.crashProfile.count30)
+      ? '近 30 天 ' + ST.crashProfile.count30 + ' 次' +
+        (isFinite(ST.crashProfile.medianGapH)
+          ? '，平均间隔 ' + Math.round(ST.crashProfile.medianGapH) + ' 小时' : '')
+      : '无记录'));
+    L.push('上次崩溃: ' + (ST.crash
+      ? agoText(ST.crash.time) + '前（' + (ST.crash.type === 'hang' ? '无响应' : '崩溃') +
+        (ST.crash.codeText ? '，' + ST.crash.codeText : (ST.crash.code ? '，' + ST.crash.code : '')) + '）'
+      : '本机无 WER 记录'));
+
+    L.push('回退副本: ' + (function () {
+      if (!backupEnabled()) return '已关闭';
+      if (!ST.projectPath) return '未打开已保存的工程';
+      var bl = listBackups(ST.projectPath);
+      return bl.length ? (bl.length + ' 份，最近 ' + agoText(bl[0].mtime) +
+                          '　' + backupDirFor(ST.projectPath)) : '暂无';
+    })());
 
     if (logEnabled()) {
       L.push('保存日志: ' + (saveLogPath() || '不可用') + '（最近 ' + ST.saves.length + ' 条）');
@@ -1690,7 +2032,42 @@
     $('inGuardRisk').value = cg.riskSave;
     $('inGuardCool').value = cg.cooldownMin;
     $('cbSaveLog').checked = !!cg.log;
+    $('cbBackup').checked = !!cg.backup;
+    $('inKeep').value = cg.keepBackups;
     syncLogHint();
+    syncModeHint();
+  }
+
+  /* 档位说明：为什么要这个档，以及它是自动选的还是用户自己选的 */
+  function syncModeHint() {
+    var sel = $('selGuardMode');
+    var el = $('modeHint');
+    if (!USR) return;
+    var cg = USR.crashGuard;
+
+    if (sel) sel.value = cg.mode;
+
+    if (!el) return;
+    var label = (Guard && Guard.MODES[cg.mode]) ? Guard.MODES[cg.mode].label : cg.mode;
+    var p = ST.crashProfile;
+    var parts = [];
+
+    if (p && isFinite(p.count30)) {
+      parts.push('本机近 30 天崩过 ' + p.count30 + ' 次');
+      if (isFinite(p.medianGapH) && p.medianGapH > 0) {
+        parts.push('平均间隔约 ' + (p.medianGapH >= 48
+          ? Math.round(p.medianGapH / 24) + ' 天'
+          : Math.round(p.medianGapH) + ' 小时'));
+      }
+    } else {
+      parts.push('本机没有崩溃记录');
+    }
+    if (cg.detectedAt) {
+      parts.push('档位于 ' + agoText(cg.detectedAt) + '自动检测');
+    }
+    parts.push('「' + label + '」= 最多攒 ' + cg.holdMin + ' 分钟 / 阈值 ' + cg.riskSave + ' 分');
+
+    el.textContent = parts.join(' · ');
   }
 
   /* 抽屉里把日志文件的完整位置写出来：用户要能自己去看，而不是只被告知「有记录」 */
@@ -1713,6 +2090,75 @@
     if (b) b.hidden = false;
   }
 
+  /* ---------------- 崩溃保护档位 ---------------- */
+
+  /* 只改 crashGuard 的几个字段，其余原样保留。
+     为什么不用「重建整个 crashGuard」：那样会把 mode / detectedAt 一起冲掉，
+     用户每点一次设置就退回默认档，这种 bug 很难被察觉。 */
+  function mergeGuardCfg(patch) {
+    if (!Settings || !USR) return;
+    var g = USR.crashGuard || {};
+    var ng = {
+      on: g.on, autoSave: g.autoSave, holdMin: g.holdMin, riskSave: g.riskSave,
+      cooldownMin: g.cooldownMin, log: g.log, mode: g.mode, detectedAt: g.detectedAt,
+      backup: g.backup, keepBackups: g.keepBackups
+    };
+    for (var k in patch) { if (patch.hasOwnProperty(k)) ng[k] = patch[k]; }
+
+    USR = Settings.normalize({
+      autoCollapse: USR.autoCollapse,
+      miniMetric: USR.miniMetric,
+      quotaGB: USR.quotaGB || 0,
+      ui: USR.ui,
+      crashGuard: ng,
+      reminders: USR.reminders
+    });
+    saveCfg();
+    if (grd) grd.configure(USR.crashGuard);
+  }
+
+  /* 切换档位：把该档的积压时长与风险阈值一起写进去，用户在抽屉里能直接看到数字变了 */
+  function applyGuardMode(mode, opts) {
+    if (!Guard || !USR) return null;
+    opts = opts || {};
+    var p = Guard.preset(mode);
+    mergeGuardCfg({
+      mode: p.mode,
+      holdMin: p.holdMin,
+      riskSave: p.riskSave,
+      detectedAt: opts.stamp ? Date.now() : USR.crashGuard.detectedAt
+    });
+    syncDrawer();
+    renderGuard();
+    if (opts.toast) {
+      toast('已切到「' + Guard.MODES[p.mode].label + '」：最多攒 ' +
+            p.holdMin + ' 分钟，阈值 ' + p.riskSave + ' 分');
+    }
+    return p;
+  }
+
+  /* 读本机 WER 崩溃史 → 推荐一档 → 写进设置。
+     装好第一次运行时自动跑一次；之后只有用户点「重新检测」才会再动。 */
+  function detectGuardMode(opts) {
+    if (!AE || !AE.crashHistory || !Guard || !USR) return null;
+    opts = opts || {};
+
+    var hist = null;
+    try { hist = AE.crashHistory(); } catch (e) { hist = null; }
+    ST.crashProfile = hist;
+    ST.crash = hist ? hist.last : null;
+    ST.crashAt = Date.now();
+
+    var rec = Guard.recommend(hist);
+    applyGuardMode(rec.mode, { stamp: true });
+    renderGuard();
+
+    if (opts.silent !== true) {
+      toast('已按本机崩溃史设为「' + Guard.MODES[rec.mode].label + '」 · ' + rec.reason);
+    }
+    return rec;
+  }
+
   function applyDrawer() {
     if (!Settings) return;
 
@@ -1731,13 +2177,19 @@
       autoCollapse: $('cbAuto').checked,
       miniMetric: $('selMetric').value,
       quotaGB: USR.quotaGB || 0,          // 上限不在抽屉里改，但要原样带回去，否则会被重置成自动
+      ui: USR.ui,                          // 展开状态同理，不能被一次「确定」重置回首屏收起
       crashGuard: {
         on: $('cbGuard').checked,
         autoSave: $('cbGuardWrite').checked,
         holdMin: $('inGuardHold').value,
         riskSave: $('inGuardRisk').value,
         cooldownMin: $('inGuardCool').value,
-        log: $('cbSaveLog').checked
+        log: $('cbSaveLog').checked,
+        backup: $('cbBackup').checked,
+        keepBackups: $('inKeep').value,
+        // 档位与检测时间必须原样带回，否则一次「确定」就把自动检测结果抹掉
+        mode: $('selGuardMode') ? $('selGuardMode').value : USR.crashGuard.mode,
+        detectedAt: USR.crashGuard.detectedAt || 0
       },
       reminders: rem
     });
@@ -1749,6 +2201,49 @@
     evaluateGuard();
     renderGuard();
   }
+
+  /* ---------------- 四个主项的收起 / 展开 ----------------
+     首屏只给结论（已用 / 占比 / 判定），细节默认收起。
+     这是刻意的取舍：面板通常被塞进很窄的侧栏，一上来铺满参数反而看不出重点。 */
+  var CARD_IDS = { cache: 'Cache', mem: 'Mem', disk: 'Disk', guard: 'Guard' };
+
+  function cardEl(k)  { return $('card' + CARD_IDS[k]); }
+  function cardBtn(k) { return $('tg'   + CARD_IDS[k]); }
+
+  function applyCards() {
+    for (var k in CARD_IDS) {
+      if (!CARD_IDS.hasOwnProperty(k)) continue;
+      var open = !!(USR && USR.ui && USR.ui[k]);
+      var el = cardEl(k), btn = cardBtn(k);
+      if (el) el.classList.toggle('collapsed', !open);
+      if (btn) {
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.title = open ? '收起' : '展开细节';
+      }
+    }
+  }
+
+  function setCard(k, open) {
+    if (!Settings || !USR) return;
+    var ui = {
+      cache: !!USR.ui.cache, mem: !!USR.ui.mem,
+      disk: !!USR.ui.disk, guard: !!USR.ui.guard
+    };
+    ui[k] = !!open;
+    USR = Settings.normalize({
+      autoCollapse: USR.autoCollapse,
+      miniMetric: USR.miniMetric,
+      quotaGB: USR.quotaGB || 0,
+      ui: ui,
+      crashGuard: USR.crashGuard,
+      reminders: USR.reminders
+    });
+    saveCfg();
+    applyCards();
+  }
+
+  // 给自动化截图/排查用：在控制台里 __sysmonCard('cache', true) 就能展开某一项
+  window.__sysmonCard = setCard;
 
   function openDrawer() {
     syncDrawer();
@@ -1852,6 +2347,7 @@
   function init() {
     loadCfg();
     migrateQuota();
+    applyCards();          // 首屏只有结论：四个主项的细节默认收起
     if (Settings && Reminder) {
       ENG = Reminder.create({});
       // 每秒跑一次纯计算，不读磁盘、不读系统，开销可以忽略
@@ -1860,6 +2356,12 @@
 
     if (Guard && USR) {
       grd = Guard.create(USR.crashGuard);
+    }
+
+    // 装好后第一次运行：读本机 WER 崩溃史，自动选一档并写入设置。
+    // 只做一次（detectedAt 记着时间），之后不覆盖用户的手动选择。
+    if (AE && Guard && USR && !USR.crashGuard.detectedAt) {
+      detectGuardMode({ silent: false });
     }
 
     loadHist();   // 上次会话的采样点，避免一打开就"采样中"
@@ -1892,6 +2394,49 @@
       if (!p) { toast('日志不可用（需要 Node.js）'); return; }
       openFolder(pathmod.dirname(p));
     });
+
+    // 切档位：立刻把该档的数字写进设置，并给出反馈（不然用户不知道改了什么）
+    var selMode = $('selGuardMode');    if (selMode) {
+      selMode.addEventListener('change', function () {
+        applyGuardMode(this.value, { toast: true });
+      });
+    }
+
+    // 重新检测：只在用户主动点的时候重读 WER
+    var btnDetect = $('btnGuardDetect');
+    if (btnDetect) {
+      btnDetect.addEventListener('click', function () {
+        if (!AE || !AE.crashHistory) { toast('检测需要 Node 环境（在 AE 面板里可用）'); return; }
+        detectGuardMode({ silent: false });
+        syncModeHint();
+      });
+    }
+
+    var bkOpen = $('btnBkOpen');
+    if (bkOpen) {
+      bkOpen.addEventListener('click', function () {
+        var d = ST.projectPath ? backupDirFor(ST.projectPath) : backupRoot();
+        if (!d) { toast('需要 Node 环境'); return; }
+        if (!fs.existsSync(d)) { toast('还没有备份目录（下次保护保存时创建）'); return; }
+        openFolder(d);
+      });
+    }
+    var bkRestore = $('btnBkRestore');
+    if (bkRestore) bkRestore.addEventListener('click', restoreLatest);
+
+    // 四个主项的展开键（右上角）
+    for (var ck in CARD_IDS) {
+      if (!CARD_IDS.hasOwnProperty(ck)) continue;
+      (function (key) {
+        var b = cardBtn(key);
+        if (!b) return;
+        b.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          setCard(key, !(USR && USR.ui && USR.ui[key]));
+        });
+      })(ck);
+    }
 
     $('intervalSel').addEventListener('change', function () {
       ST.interval = parseInt(this.value, 10) || 0;

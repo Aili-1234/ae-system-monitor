@@ -169,17 +169,58 @@
       return null;
     }
 
-    /* ---------- 主入口：读取偏好 ---------- */
-    function loadPrefs() {
-      var root = prefsRoot();
-      var vers = versionDirs(root);
-      var found = null;
+    /* ---------- 主入口：读取偏好 ----------
+       版本必须与「运行中的 AE」对齐。本机 AE 23（115 GB）与 24（149 GB）并存，
+       若永远取最高版本，开 2023 时会拿 24 的配额去算填充率与余量 ——
+       而且错的方向是「看起来更安全」，最难被发现的那种错。
 
-      for (var i = 0; i < vers.length; i++) {
-        var f = findPrefsIn(root, vers[i]);
-        if (f) { found = f; break; }
+       选择顺序（三段回退：总能读到值，但如实标记是否精确）：
+         1) 与运行版本精确匹配
+         2) 不高于运行版本的最高版本
+         3) 全局最高版本
+       app.version 形如 24.2.1，而目录名是 24.2，所以一律先过 verShort()。 */
+    function pickPrefs(root, wantVer) {
+      var vers = versionDirs(root);                        // 已降序
+      var want = wantVer ? verShort(wantVer) : '';
+      var order = [], seen = {};
+
+      function add(v) {
+        if (!v || seen[v]) return;
+        seen[v] = 1;
+        order.push(v);
       }
-      if (!found) return null;
+
+      if (want) {
+        add(want);                                         // 1) 精确
+        for (var i = 0; i < vers.length; i++) {            // 2) 不高于运行版本
+          if (cmpVer(vers[i], want) <= 0) add(vers[i]);
+        }
+        for (var j = 0; j < vers.length; j++) add(vers[j]);  // 3) 全局（含更高版本）
+      } else {
+        for (var k = 0; k < vers.length; k++) add(vers[k]);
+      }
+
+      for (var n = 0; n < order.length; n++) {
+        var f = findPrefsIn(root, order[n]);
+        if (f) {
+          return {
+            found: f,
+            want: want,
+            // true 精确 / false 回退 / null 不知道运行版本
+            matched: want ? (cmpVer(order[n], want) === 0) : null
+          };
+        }
+      }
+      return null;
+    }
+
+    function loadPrefs(runningVer, opts) {
+      opts = opts || {};
+      var root = opts.root || prefsRoot();                 // opts.root 只为测试注入
+      var pick = pickPrefs(root, runningVer);
+      if (!pick) return null;
+
+      var found = pick.found;                              // { path, text, ver }
 
       var dc = sectionOf(found.text, SEC_DC);
       var ac = sectionOf(found.text, SEC_ADC);
@@ -195,6 +236,8 @@
       return {
         path: found.path,
         ver: found.ver,
+        runVer: pick.want,          // 运行版本（空串 = 还没拿到 app.version）
+        verMatched: pick.matched,   // true 精确 / false 回退 / null 未知
         folder: folderRaw ? decodeAEString(folderRaw).replace(/[\\/]+$/, '') : '',
         maxSizeGB: isFinite(maxGB) ? maxGB : 0,
         enabled: enRaw === null ? true : (enRaw === '1'),
@@ -282,6 +325,175 @@
       return best;
     }
 
+    /* ---------- 本机崩溃史 ----------
+       崩溃的「残留证据」比任何预测都有说服力，而且它能区分机器：
+       一年崩一次的机器 vs 每天崩两次的机器，同一个「3 小时前崩过」意义完全不同。
+
+       Windows 把每次 APPCRASH / APPHANG 落成一个目录：
+         %ProgramData%\Microsoft\Windows\WER\ReportArchive\AppCrash_AfterFX.exe_<hash>
+         （也有用户级的 %LOCALAPPDATA%\Microsoft\Windows\WER\ReportArchive）
+       注意：Windows 会清理旧报告，所以次数只能当「至少」，不能当完整历史。
+       AE 自己的 <prefsRoot>\<ver>\logs 在 Windows 上常是空的（实测本机 0 个文件），
+       所以以 WER 为主。 */
+
+    function crashRoots() {
+      var roots = [];
+      if (typeof process === 'undefined' || !process.env) return roots;
+      if (process.env.ProgramData) {
+        roots.push(path.join(process.env.ProgramData, 'Microsoft', 'Windows', 'WER', 'ReportArchive'));
+      }
+      if (process.env.LOCALAPPDATA) {
+        roots.push(path.join(process.env.LOCALAPPDATA, 'Microsoft', 'Windows', 'WER', 'ReportArchive'));
+      }
+      return roots;
+    }
+
+    /* WER 的异常代码 → 人话。写在这里而不是 UI 里，因为它是事实层面的解释 */
+    var CRASH_CODES = {
+      'c0000374': '堆损坏（常见于第三方插件/内存越界）',
+      'c0000005': '访问冲突（读了非法地址）',
+      'c0000409': '栈缓冲区溢出',
+      'c00000fd': '栈溢出',
+      'c0000017': '内存不足（无法分配）',
+      'c0000135': '缺少依赖 DLL',
+      '80000003': '断言失败（断点）'
+    };
+
+    function crashCodeText(code) {
+      if (!code) return '';
+      var k = String(code).toLowerCase().replace(/^0x/, '');
+      return CRASH_CODES[k] || '';
+    }
+
+    /* 把所有 AfterFX 的崩溃目录扫出来（不去重、不排序以外的处理） */
+    function scanCrashDirs(roots) {
+      var out = [];
+      var seen = {};
+      for (var r = 0; r < roots.length; r++) {
+        var ents = listSync(roots[r]);          // 无权限时 listSync 自己吞掉
+        for (var i = 0; i < ents.length; i++) {
+          var e = ents[i];
+          if (!e.isDir) continue;
+          if (!/AfterFX|After Effects/i.test(e.name)) continue;
+          var full = path.join(roots[r], e.name);
+          var st = null;
+          try { st = fs.statSync(full); } catch (err) { continue; }
+          var key = full.toLowerCase();
+          if (seen[key]) continue;
+          seen[key] = 1;
+          out.push({ dir: full, mtime: st.mtimeMs, name: e.name });
+        }
+      }
+      return out;
+    }
+
+    /* 读 Report.wer 里的类型 / 异常代码 / 故障模块。
+       WER 写的是 UTF-16LE，按 utf8 读会变成一堆 NUL、正则永远匹配不上，
+       所以按 BOM，再用 NUL 密度兜底。 */
+    function parseWer(dir) {
+      var code = '', mod = '', type = '';
+      try {
+        var buf = fs.readFileSync(path.join(dir, 'Report.wer'));
+        var txt;
+        if (buf.length > 1 && buf[0] === 0xFF && buf[1] === 0xFE) {
+          txt = buf.toString('utf16le');
+        } else if (buf.length > 2 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) {
+          txt = buf.slice(3).toString('utf8');
+        } else {
+          var nul = 0, probe = Math.min(buf.length, 400);
+          for (var bi = 0; bi < probe; bi++) if (buf[bi] === 0) nul++;
+          txt = (nul > probe / 4) ? buf.toString('utf16le') : buf.toString('utf8');
+        }
+        var mType = /^EventType=(.+)$/m.exec(txt);
+        if (mType) type = /hang/i.test(mType[1]) ? 'hang' : 'crash';
+        var mCode = /^Sig\[6\]\.Value=(.+)$/m.exec(txt);
+        if (mCode) code = mCode[1].trim();
+        var mMod = /^Sig\[3\]\.Value=(.+)$/m.exec(txt);
+        if (mMod) mod = mMod[1].trim();
+      } catch (e) {}
+      return { type: type, code: code, module: mod };
+    }
+
+    /* 本机崩溃画像：
+         hoursAgo     最近一次距今几小时（null = 没有任何记录）
+         count30      近 30 天次数
+         count7       近 7 天次数
+         medianGapH   相邻两次的中位间隔（小时，≥2 次才有；null = 算不出）
+         tier         机器脾气：none / rare / occasional / chronic / unknown
+         last         最近一次的类型与异常代码
+       这些数用来给判定「定标尺」——同样 3 小时前崩过，
+       对一年崩一次的机器是异常，对每天崩两次的机器只是日常。 */
+    function crashHistory(opts) {
+      opts = opts || {};
+      var now = isFinite(opts.now) ? opts.now : Date.now();
+      var roots = opts.roots || crashRoots();
+
+      var dirs = scanCrashDirs(roots);
+      if (!dirs.length) return null;
+
+      dirs.sort(function (a, b) { return b.mtime - a.mtime; });
+
+      var H = 3600000, D = 24 * H;
+      var count7 = 0, count30 = 0;
+      for (var i = 0; i < dirs.length; i++) {
+        var age = now - dirs[i].mtime;
+        if (age <= 7 * D) count7++;
+        if (age <= 30 * D) count30++;
+      }
+
+      // 中位间隔：只取 30 天内的相邻间隔，避开很久以前的偶发记录把标尺拉歪
+      var gaps = [];
+      for (var j = 0; j + 1 < dirs.length; j++) {
+        if (now - dirs[j + 1].mtime > 30 * D) break;
+        var g = (dirs[j].mtime - dirs[j + 1].mtime) / H;
+        if (g > 0) gaps.push(g);
+      }
+      gaps.sort(function (a, b) { return a - b; });
+      var medianGapH = null;
+      if (gaps.length) {
+        var mid = Math.floor(gaps.length / 2);
+        // 偶数个取中间两个的平均，别偏向上半区
+        medianGapH = (gaps.length % 2)
+          ? gaps[mid]
+          : (gaps[mid - 1] + gaps[mid]) / 2;
+      }
+
+      var newest = dirs[0];
+      var hrs = (now - newest.mtime) / H;
+      var wer = parseWer(newest.dir);
+      var type = wer.type || (/^AppHang/i.test(newest.name) ? 'hang' : 'crash');
+
+      var count30Safe = count30;
+      var tier = count30Safe <= 0 ? 'none'
+               : count30Safe === 1 ? 'rare'
+               : count30Safe <= 4 ? 'occasional'
+               : 'chronic';
+
+      return {
+        hoursAgo: hrs >= 0 ? hrs : 0,
+        count7: count7,
+        count30: count30Safe,
+        medianGapH: medianGapH,
+        tier: tier,
+        total: dirs.length,
+        last: {
+          time: newest.mtime,
+          hoursAgo: hrs >= 0 ? hrs : 0,
+          type: type,
+          code: wer.code,
+          codeText: crashCodeText(wer.code),
+          module: wer.module,
+          dir: newest.dir
+        }
+      };
+    }
+
+    /* 只要最近一次（保持旧接口，内部复用 crashHistory） */
+    function latestCrash(opts) {
+      var h = crashHistory(opts);
+      return h ? h.last : null;
+    }
+
     /* ---------- 缓存实体目录 ---------- */
     function isDir(p) {
       try { return fs.statSync(p).isDirectory(); } catch (e) { return false; }
@@ -307,7 +519,8 @@
     }
 
     // 实测结构：<Folder>\Adobe\After Effects\<ver>\Disk Cache - <主机名>.noindex
-    function resolveCacheDir(baseFolder, ver) {
+    function resolveCacheDir(baseFolder, ver, opts) {
+      opts = opts || {};
       if (!baseFolder) return '';
       var host = '';
       try { host = os.hostname(); } catch (e) {}
@@ -323,6 +536,11 @@
       for (var i = 0; i < direct.length; i++) {
         if (isDir(direct[i])) return direct[i];
       }
+
+      // 严格模式只认上面这些精确位置。
+      // 用途：两个版本都装着时，深度兜底会挑「最近改动」的那个目录，
+      // 而那很可能是另一个版本的 —— 宁可返回空，让调用方按版本再试一次。
+      if (opts.strict) return '';
 
       var deep = findDirs(baseFolder, /^Disk Cache.*\.noindex$/i, 4);
       if (deep.length) {
@@ -500,8 +718,12 @@
 
     return {
       loadPrefs: loadPrefs,
+      pickPrefs: pickPrefs,
       loadAutoSavePrefs: loadAutoSavePrefs,
       latestAutoSave: latestAutoSave,
+      latestCrash: latestCrash,
+      crashHistory: crashHistory,
+      crashCodeText: crashCodeText,
       resolveCacheDir: resolveCacheDir,
       otherVersionCacheDirs: otherVersionCacheDirs,
       scanDir: scanDir,

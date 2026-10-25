@@ -66,12 +66,16 @@ console.log('\n[2] 积压超时触发（hold）');
 console.log('\n[3] 高风险立即触发（risk）');
 {
   const { g } = mk();
-  // 内存 95% -> 45 分，磁盘余量 -3GB -> 40 分
+  // v2 起物理内存降权为 20（辅助信号）：AE 的崩溃是分配失败，看提交上限而非物理余量。
+  // 这里同时钉住两件事，防止以后有人「顺手」把权重改回去：
   const r = g.evaluate(S({ memPct: 95, marginGB: -3 }), T0);
-  ok('风险分 85', r.risk === 85, r.risk);
+  ok('物理内存 95 + 余量 -3 → 60（20+40）', r.risk === 60, r.risk);
   ok('等级 high', r.level === 'high', r.level);
   ok('立即保存且原因为 risk', r.shouldSave && r.why === 'risk', r.why);
   ok('两条理由都列出', r.reasons.length === 2, r.reasons.join(' | '));
+
+  const r2 = G.create().evaluate(S({ commitPct: 95, marginGB: -3 }), T0);
+  ok('提交内存 95 + 余量 -3 → 85（45+40）', r2.risk === 85, r2.risk);
 }
 
 console.log('\n[4] 风险分级与权重');

@@ -18,6 +18,7 @@
   --ok:      #7fbf9a;
   --warn:    #c9a35e;
   --bad:     #c97070;
+  --accent:  #6a6a6a;   /* 进度条默认色：低于告警线时用这个中性灰 */
 }
 
 * { box-sizing: border-box; }
@@ -64,6 +65,8 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
   border-bottom: 1px solid var(--line);
 }
 .hd-left, .hd-right { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.hd-left { flex: 1 1 auto; overflow: hidden; }
+.hd-right { flex: 0 0 auto; }
 
 .live {
   width: 5px; height: 5px; border-radius: 50%;
@@ -156,6 +159,78 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 }
 .card-hd-r { color: var(--fg-3); font-size: 9.5px; letter-spacing: 0; }
 
+/* ---------------- 四个主项：默认收起，右上角展开 ---------------- */
+/* 标题在左，状态/汇总靠右，展开键固定在最右。
+   窄屏（面板常被塞进 300px 侧栏）时标题与状态允许截断，
+   但展开键必须永远可见 —— 它一旦被挤出可视区，功能就相当于没了。 */
+.card-hd { justify-content: flex-start; align-items: center; min-width: 0; }
+.card-hd > span:first-child,
+.card-hd > .pill,
+.card-hd > .card-hd-r {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-hd > .pill,
+.card-hd > .card-hd-r { margin-left: auto; }
+.card-hd > .tg { margin-left: auto; }
+.card-hd > .pill + .tg,
+.card-hd > .card-hd-r + .tg { margin-left: 7px; }
+
+/* 细节区：收起时不占位，展开时用一条细线跟概要分开 */
+.card-body {
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+.card.collapsed .card-body { display: none; }
+.card.collapsed { padding-bottom: 2px; }
+
+/* 细节区内部收紧：展开后是「一屏能读完的一组数」，不是一篇文章 */
+.card-body > *:first-child { margin-top: 0; }
+.card-body .pathrow { margin-top: 8px; }
+.card-body .kv { margin-top: 0; }
+#bdMem .kv { grid-template-columns: repeat(2, 1fr); }
+
+.tg {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease;
+}
+.tg::after {
+  content: '';
+  display: block;
+  width: 5px; height: 5px;
+  margin: 0 auto;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: translateY(-1px) rotate(45deg);   /* 收起时朝下 */
+}
+.card:not(.collapsed) .tg::after { transform: translateY(1px) rotate(-135deg); }  /* 展开时朝上 */
+.tg:hover { color: var(--fg); border-color: var(--line-2); background: var(--bg-hi); }
+
+/* 缓存卡里的媒体缓存一行：夹在路径行之间，别抢主数字 */
+.mini-num {
+  margin-left: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.mini-sub {
+  margin-left: 5px;
+  font-size: 9px;
+  font-style: normal;
+  color: var(--fg-3);
+}
+
 /* ---------------- 状态点（取代彩色胶囊） ---------------- */
 .pill {
   display: inline-flex; align-items: center; gap: 5px;
@@ -179,7 +254,8 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;          /* 窄屏时「上限」换到下一行，别把右边挤出去 */
+  gap: 4px 8px;
   margin-bottom: 9px;
 }
 
@@ -208,6 +284,7 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 .hero-quota {
   display: flex; align-items: baseline; gap: 3px;
   flex: 0 0 auto;
+  margin-left: auto;        /* 换行后仍靠右 */
   font-size: 9.5px; color: var(--fg-3);
 }
 .hero-quota .lbl { color: var(--fg-3); }
@@ -299,6 +376,8 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 .pathrow + .pathrow { margin-top: 6px; }
 /* 「其他版本缓存」这一行是中文说明、不是路径，别用等宽 9px 去糊它 */
 .path.txt { font-family: inherit; font-size: 9.5px; letter-spacing: .01em; }
+/* 偏好版本不匹配：数字可能是别的版本的，必须显眼——错得「更安全」最难发现 */
+.path.txt.warn { color: var(--warn); }
 
 /* ---------------- 内存环（细环） ---------------- */
 .gauge-row { display: flex; align-items: center; gap: 14px; }
@@ -401,6 +480,7 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
   min-height: 12px;
 }
 .crate.warn { color: var(--warn); }
+.crate.bad { color: var(--bad); }
 
 /* ---------------- 崩溃保护 ---------------- */
 .gd-line {
