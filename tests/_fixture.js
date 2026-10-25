@@ -87,8 +87,16 @@ function makeFixture(opts) {
   const files = opts.files === undefined ? 6 : opts.files;
   const sizeEach = opts.sizeEach === undefined ? 1024 : opts.sizeEach;
 
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-sysmon-fixture-'));
+  // 故意让路径里带一个中文字段：AE 会把非 ASCII 拆成十六进制写进偏好，
+  // 解码是否正确是这组测试要守的东西，所以 fixture 必须真的包含中文。
+  // 注意不能指望 os.tmpdir() 自带中文（CI runner 是 C:\Users\RUNNER~1\...），
+  // 因此在临时目录下再套一层「李」。
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-sysmon-fixture-'));
+  const home = path.join(root, CN_USER);
+  mkdirp(home);
+
   const prefsDir = path.join(home, 'AppData', 'Roaming', 'Adobe', 'After Effects', VER);
+  const prefsDirMac = path.join(home, 'Library', 'Preferences', 'Adobe', 'After Effects', VER);
   const folder = path.join(home, 'cache');
   const cacheDir = path.join(folder, 'Adobe', 'After Effects',
     VER, 'Disk Cache - ' + HOST + '.noindex');
@@ -99,6 +107,9 @@ function makeFixture(opts) {
   const encoded = folder.split(CN_USER).join('"' + hex + '"');
 
   writeFile(path.join(prefsDir, '设置.txt'), prefsText(encoded));
+  // prefsRoot() 按 process.platform 选路径，而 process.platform 是跑测试那台机器的
+  // 真实平台（stub 盖不住它）。两份都写，Windows 与 Linux/mac 都读得到。
+  writeFile(path.join(prefsDirMac, '设置.txt'), prefsText(encoded));
 
   // 自动保存目录：造一个新版 .aep，用来验证 latestAutoSave 真的能找到最新一份
   const autoSaveFolder = path.join(home, 'Documents', 'Adobe', 'After Effects', 'Auto-Save');
@@ -108,6 +119,8 @@ function makeFixture(opts) {
   const autoEncoded = autoSaveFolder.split(CN_USER).join('"' + hex + '"');
 
   writeFile(path.join(prefsDir, 'Adobe After Effects ' + VER + ' Prefs-indep-general.txt'),
+    generalPrefsText(autoEncoded));
+  writeFile(path.join(prefsDirMac, 'Adobe After Effects ' + VER + ' Prefs-indep-general.txt'),
     generalPrefsText(autoEncoded));
   cacheTree(cacheDir, files, sizeEach);
 
