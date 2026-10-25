@@ -53,6 +53,8 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
   flex-direction: column;
   padding: 12px 14px 10px;
   min-height: 100%;
+  /* 提示框容器要相对面板定位，所以这里必须是定位上下文 */
+  position: relative;
 }
 
 /* ---------------- 顶栏 ---------------- */
@@ -552,21 +554,64 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 }
 .ft span { overflow: hidden; text-overflow: ellipsis; }
 
-/* ---------------- 吐司 ---------------- */
+/* ---------------- 底部堆叠区 ----------------
+   1.6.0 新增。提醒条与提示框共用一个固定在面板底部的容器：
+     · 容器宽度 = 面板宽度，提示框与提醒条都不会溢出到面板外
+     · 提醒在上、提示框在下，两者不再互相盖住
+   之前两者各自 position:fixed 挂在 body 上，窄面板时
+   提示框会横着溢出面板，动作按钮点不到。 */
+.bottom-stack {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  z-index: 90;
+  display: flex; flex-direction: column;
+  gap: 6px;
+  padding: 8px 8px 8px;
+  pointer-events: none;
+}
+.bottom-stack > * { pointer-events: auto; }
+
+/* ---------------- 吐司 ----------------
+   1.6.0 改版：提示框必须落在面板自己的显示框内，
+   并且 .show 时必须把 pointer-events 恢复成 auto ——
+   1.5.0 引入动作按钮（取回上一版）时漏了这一步，
+   按钮渲染出来了但永远点不动。这次一并修掉。 */
+.toast-host {
+  display: flex; flex-direction: column;
+  align-items: stretch; gap: 6px;
+}
 .toast {
-  position: fixed; left: 50%; bottom: 16px;
-  transform: translate(-50%, 10px);
+  position: relative;
   background: #262626; color: var(--fg);
   border: 1px solid var(--line-2); border-radius: 4px;
   padding: 5px 11px; font-size: 10px;
   opacity: 0; pointer-events: none;
+  transform: translateY(8px);
   transition: opacity .18s ease, transform .18s ease;
-  z-index: 99; white-space: normal; max-width: calc(100vw - 24px); display: flex; align-items: center; gap: 10px;
+  white-space: normal;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .45);
 }
-.toast-action { background: transparent; border: 1px solid currentColor; border-radius: 3px;
-  color: #f5f5f5; padding: 3px 7px; cursor: pointer; white-space: nowrap; }
+.toast-msg { flex: 1 1 auto; min-width: 0; word-break: break-word; }
+.toast-action {
+  flex: 0 0 auto;
+  background: transparent; border: 1px solid currentColor; border-radius: 3px;
+  color: #f5f5f5; padding: 3px 7px; cursor: pointer; white-space: nowrap;
+}
 .toast-action:hover { background: #333; }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+/* 小窗（极简）模式下的提示框：
+   窄面板里横排的「文字 + 按钮」会把按钮挤出可视区，
+   所以小窗下改成竖排 —— 文字一行、动作按钮独占一行并占满宽度。
+   这是"按钮要在显示框内、能点到"这条要求在小窗侧的对应实现。 */
+body.compact .toast { flex-direction: column; align-items: stretch; gap: 6px; padding: 7px 9px; }
+body.compact .toast-msg { font-size: 9.5px; }
+body.compact .toast-action {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 9.5px;
+  text-align: center;
+}
 
 /* ============================================================
    折叠小窗
@@ -721,9 +766,7 @@ input[type="checkbox"]:checked { background: var(--fg-2); border-color: var(--fg
    提醒条（无声音，纯视觉）
    ============================================================ */
 .remind {
-  position: fixed;
-  left: 8px; right: 8px; bottom: 8px;
-  z-index: 70;
+  position: relative;
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -745,6 +788,10 @@ input[type="checkbox"]:checked { background: var(--fg-2); border-color: var(--fg
   font-size: 10px; color: var(--fg-2);
   margin-top: 3px; line-height: 1.55;
 }
+/* 极简模式下点标题展开完整消息 */
+.rm-txt span.expanded { color: var(--fg); }
+.rm-txt b[title] { cursor: pointer; }
+.rm-txt b[title]:hover { color: var(--fg); text-decoration: underline dotted var(--fg-3); }
 .rm-act { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
 .rm-act button {
   background: transparent;
@@ -758,3 +805,32 @@ input[type="checkbox"]:checked { background: var(--fg-2); border-color: var(--fg
   transition: color .12s, border-color .12s;
 }
 .rm-act button:hover { color: var(--fg); border-color: var(--fg-3); }
+
+/* 小窗（极简）模式下的提醒条：
+   面板只有 100~120px 宽，横排三段（图标/文字/按钮）必然挤爆。
+   这里改成竖排：图标+标题一行，消息折叠，动作按钮横排一行占满宽度。
+   按钮变大是为了在窄面板里好点 —— 这是"提示框要在显示框内、
+   方便点击交互按钮"这条要求在小窗侧的对应实现。 */
+body.compact .bottom-stack { padding: 6px; gap: 5px; }
+body.compact .remind {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 9px;
+}
+body.compact .rm-ico { font-size: 15px; align-self: flex-start; }
+body.compact .rm-txt b { font-size: 10.5px; }
+body.compact .rm-txt span { font-size: 9.5px; margin-top: 2px; }
+body.compact .rm-act { flex-direction: row; gap: 5px; }
+body.compact .rm-act button {
+  flex: 1 1 auto;
+  font-size: 9.5px;
+  padding: 4px 6px;
+  color: var(--fg-2);
+  border-color: var(--line-2);
+}
+body.compact .rm-act button:hover { color: var(--fg); border-color: var(--fg-3); }
+/* 小窗里不需要长消息，它会把按钮挤到看不见 */
+body.compact .rm-txt span { max-height: 2.9em; overflow: hidden; }
+/* 但用户主动点开完整消息时，必须能看全 */
+body.compact .rm-txt span.expanded { max-height: none; overflow: visible; }

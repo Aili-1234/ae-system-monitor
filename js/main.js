@@ -196,25 +196,62 @@
     return '…\\' + parts.slice(-2).join('\\');
   }
 
+  /* 提示框（吐司）。
+     1.6.0 起必须**落在面板自己的显示框内**（#toastHost 是 .app 里的定位容器），
+     不能用 position:fixed 挂在 body 上 —— CEP 面板是停靠面板，
+     fixed 会以视口为基准，窄侧栏下提示框会溢出到面板外，
+     按钮就点不到了。
+     2. pointer-events 必须在 .show 时恢复为 auto。
+     1.5.0 引入动作按钮（取回上一版）时漏了这一步，
+     按钮渲染出来了但永远点不动 —— 这次一并修掉。 */
   function toast(msg, action) {
+    var host = $('toastHost');
+    if (!host) host = document.body;
+
     var t = document.createElement('div');
     t.className = 'toast';
     var message = document.createElement('span');
+    message.className = 'toast-msg';
     message.textContent = msg;
     t.appendChild(message);
     if (action && action.label && typeof action.run === 'function') {
       var btn = document.createElement('button');
       btn.className = 'toast-action';
       btn.textContent = action.label;
-      btn.onclick = function () { action.run(); if (t.parentNode) t.parentNode.removeChild(t); };
+      btn.onclick = function (ev) {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        action.run();
+        dismiss();
+      };
       t.appendChild(btn);
     }
-    document.body.appendChild(t);
-    requestAnimationFrame(function () { t.classList.add('show'); });
-    setTimeout(function () {
+
+    var timer = null;
+    function dismiss() {
+      if (timer) { clearTimeout(timer); timer = null; }
       t.classList.remove('show');
-      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 260);
-    }, action ? 5000 : 2600);
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 180);
+    }
+
+    host.appendChild(t);
+    requestAnimationFrame(function () { t.classList.add('show'); });
+    // 有动作按钮的给足 5 秒；纯提示 2.6 秒
+    timer = setTimeout(dismiss, action ? 5000 : 2600);
+
+    // 点击空白处也能关掉（带按钮时更容易误点，空白点击是明确意图）
+    t.onclick = function () {
+      if (!action) dismiss();
+    };
+
+    // 同一个面板里最多留 3 条，超出的从最旧的开始清
+    var kids = host.children;
+    while (kids.length > 3) {
+      var old = kids[0];
+      host.removeChild(old);
+      kids = host.children;
+    }
+
+    return t;
   }
 
   /* ---------------- 磁盘查询 ---------------- */
@@ -1979,7 +2016,10 @@
 
     $('rmIco').textContent = it.icon || '•';
     $('rmTitle').textContent = it.title || '提醒';
-    $('rmMsg').textContent = it.msg || '';
+    // 极简（小窗）模式用短消息：窄面板里长句会把动作按钮挤出可视区
+    $('rmMsg').textContent = compact && it.shortMsg ? it.shortMsg : (it.msg || '');
+    $('rmMsg').classList.remove('expanded');
+    rmMsgExpanded = false;
 
     var bar = $('remindBar');
     bar.className = 'remind' + (it.level === 'warn' ? ' warn' : '');
@@ -1997,7 +2037,23 @@
     $('remindBar').hidden = true;
     $('miniRing').classList.remove('alerting');
     rmCur = null;
+    rmMsgExpanded = false;
     if (rmQueue.length) setTimeout(showNextRemind, 420);
+  }
+
+  /* 极简模式下点标题可以来回切换「短消息 / 完整消息」。
+     没有这一步的话，极简模式的用户永远看不到完整提示内容
+     （小窗放不下）。 */
+  var rmMsgExpanded = false;
+
+  function toggleRemindMsg() {
+    if (!rmCur) return;
+    var msgEl = $('rmMsg');
+    if (!msgEl) return;
+    if (!rmCur.shortMsg || rmCur.shortMsg === rmCur.msg) return;
+    rmMsgExpanded = !rmMsgExpanded;
+    msgEl.textContent = rmMsgExpanded ? (rmCur.msg || '') : rmCur.shortMsg;
+    msgEl.classList.toggle('expanded', rmMsgExpanded);
   }
 
   function reminderTick() {
@@ -2031,10 +2087,116 @@
     ['cbMem',   'inMem',   'mem']
   ];
 
+  /* 提醒设置区的摘要。
+     原来只有四行一模一样的「勾选 + 数字」，用户看不出现在到底开了哪几条、
+     间隔多少。这里把实际生效的状态直接写出来，改设置时能立刻确认结果。
+     纯展示，不参与判定 —— 关掉这行不影响功能。 */
+  var REMIND_LABELS = {
+    water: '喝水', stand: '起身', eyes: '远眺', mem: '内存播报'
+  };
+
+  function syncRemindSummary() {
+    var el = $('remindSummary');
+    if (!el || !USR || !USR.reminders) { if (el) el.textContent = '—'; return; }
+    var on = [], off = [];
+    for (var k in REMIND_LABELS) {
+      if (!REMIND_LABELS.hasOwnProperty(k)) continue;
+      var rc = USR.reminders[k];
+      if (!rc) continue;
+      if (rc.on) on.push(REMIND_LABELS[k] + ' ' + rc.everyMin + '分');
+      else off.push(REMIND_LABELS[k]);
+    }
+    var mh = USR.reminders.memHigh;
+    var mhTxt = (mh && mh.on) ? ('内存偏高 ' + mh.thresholdPct + '%') : '';
+
+    if (!on.length && !mhTxt) {
+      el.textContent = '当前没有开启任何提醒。';
+      return;
+    }
+    var parts = [];
+    if (on.length) parts.push('已开启：' + on.join('、'));
+    if (mhTxt) parts.push(mhTxt);
+    if (off.length) parts.push('未开启：' + off.join('、'));
+    el.textContent = parts.join('　·　');
+  }
+
+  /* 一次把三条身体提醒填成常用间隔。
+     为什么给这个按钮：四个数字输入框要一个个点，
+     而多数人其实就用默认那套间隔。
+     注意：它只改数字不改开关 —— 开关是用户自己的选择。 */
+  var REMIND_PRESET = { water: 45, stand: 60, eyes: 40, mem: 30 };
+
+  function applyRemindPreset() {
+    if (!Settings || !USR) return;
+    var rem = {};
+    for (var i = 0; i < DW_FIELDS.length; i++) {
+      var f = DW_FIELDS[i];
+      var id = f[2];
+      rem[id] = {
+        on: USR.reminders[id] ? !!USR.reminders[id].on : false,
+        everyMin: REMIND_PRESET[id] !== undefined ? REMIND_PRESET[id] : 45
+      };
+    }
+    USR = Settings.normalize({
+      autoCollapse: USR.autoCollapse,
+      miniMetric: USR.miniMetric,
+      uiDefault: USR.uiDefault,
+      quotaGB: USR.quotaGB || 0,
+      ui: USR.ui,
+      crashGuard: USR.crashGuard,
+      reminders: rem
+    });
+    saveCfg();
+    syncDrawer();
+    toast('已填入常用间隔：喝水 45 / 起身 60 / 远眺 40 / 内存 30 分');
+  }
+
+  /* 正在输入时的摘要预览。
+     用抽屉里的实际控件值算，而不是 USR —— USR 要等 change 才更新。
+     输入框里的值可能是空的或非法，这时退回 USR 里的原值，
+     别让摘要显示出「NaN 分」这种东西。 */
+  var REMIND_INPUTS = { inWater: 'water', inStand: 'stand', inEyes: 'eyes', inMem: 'mem' };
+  var REMIND_INPUTS_CB = { water: 'cbWater', stand: 'cbStand', eyes: 'cbEyes', mem: 'cbMem' };
+
+  function previewRemindSummary(inputId) {
+    var el = $('remindSummary');
+    if (!el || !USR || !USR.reminders) return;
+    var id = REMIND_INPUTS[inputId];
+    if (!id) return;
+    var raw = $(inputId).value;
+    var n = Number(raw);
+    var rc = USR.reminders[id];
+    var every = (raw !== '' && isFinite(n) && n >= 5 && n <= 240)
+      ? Math.round(n)
+      : (rc ? rc.everyMin : 45);
+
+    var on = [], off = [];
+    for (var k in REMIND_LABELS) {
+      if (!REMIND_LABELS.hasOwnProperty(k)) continue;
+      var r = USR.reminders[k];
+      if (!r) continue;
+      var isTarget = (k === id);
+      var onNow = isTarget ? $(REMIND_INPUTS_CB[k]).checked : r.on;
+      if (onNow) on.push(REMIND_LABELS[k] + ' ' + (isTarget ? every : r.everyMin) + '分');
+      else off.push(REMIND_LABELS[k]);
+    }
+    var mh = USR.reminders.memHigh;
+    var mhTxt = (mh && mh.on) ? ('内存偏高 ' + mh.thresholdPct + '%') : '';
+    var parts = [];
+    if (on.length) parts.push('已开启：' + on.join('、'));
+    if (mhTxt) parts.push(mhTxt);
+    if (off.length) parts.push('未开启：' + off.join('、'));
+    el.textContent = parts.length ? parts.join('　·　') : '当前没有开启任何提醒。';
+  }
+
+  /* 提醒输入框 → 开关控件的对应表（preview 用） */
+
   function syncDrawer() {
     if (!USR) return;
     $('cbAuto').checked = !!USR.autoCollapse;
     $('selMetric').value = USR.miniMetric;
+    if ($('selUiDefault')) $('selUiDefault').value = USR.uiDefault || 'compact';
+    syncRemindSummary();
 
     DW_FIELDS.forEach(function (f) {
       var rc = USR.reminders[f[2]];
@@ -2131,6 +2293,7 @@
     USR = Settings.normalize({
       autoCollapse: USR.autoCollapse,
       miniMetric: USR.miniMetric,
+      uiDefault: USR.uiDefault,
       quotaGB: USR.quotaGB || 0,
       ui: USR.ui,
       crashGuard: ng,
@@ -2199,6 +2362,7 @@
     USR = Settings.normalize({
       autoCollapse: $('cbAuto').checked,
       miniMetric: $('selMetric').value,
+      uiDefault: $('selUiDefault').value,
       quotaGB: USR.quotaGB || 0,          // 上限不在抽屉里改，但要原样带回去，否则会被重置成自动
       ui: USR.ui,                          // 展开状态同理，不能被一次「确定」重置回首屏收起
       crashGuard: {
@@ -2220,18 +2384,59 @@
     saveCfg();
     if (grd) grd.configure(USR.crashGuard);
     syncDrawer();      // 把被裁剪后的真实值回填，用户能看见 3 变成 5
+    applyUiDefault();  // 「首屏视图」改完立即生效，用户不用重启面板
+    applyCards();
     renderMini();
     evaluateGuard();
     renderGuard();
   }
 
   /* ---------------- 四个主项的收起 / 展开 ----------------
-     首屏只给结论（已用 / 占比 / 判定），细节默认收起。
-     这是刻意的取舍：面板通常被塞进很窄的侧栏，一上来铺满参数反而看不出重点。 */
+     首屏默认只给结论（已用 / 占比 / 判定），细节收起。
+     这是刻意的取舍：面板通常被塞进很窄的侧栏，一上来铺满参数反而看不出重点。
+     但 1.6.0 起这个取舍变成**可配置的**（USR.uiDefault）：
+       compact  全部收起（极简，默认）
+       full     全部展开（完整）
+       remember 沿用上次会话里的展开状态
+     用户在设置抽屉里改，改完立即生效。 */
   var CARD_IDS = { cache: 'Cache', mem: 'Mem', disk: 'Disk', guard: 'Guard' };
 
   function cardEl(k)  { return $('card' + CARD_IDS[k]); }
   function cardBtn(k) { return $('tg'   + CARD_IDS[k]); }
+
+  /* 首屏该展开哪些。compact/full 直接决定；remember 用记住的状态。
+     注意：这只在**首屏初始化**时调用一次（applyUiDefault）。
+     运行期 applyCards 读的是 USR.ui —— 否则用户手动展开某一项会被 uiDefault 立刻按回去。 */
+  function initialCardState() {
+    var mode = (USR && USR.uiDefault) ? USR.uiDefault : 'compact';
+    if (mode === 'full') {
+      return { cache: true, mem: true, disk: true, guard: true };
+    }
+    if (mode === 'compact') {
+      return { cache: false, mem: false, disk: false, guard: false };
+    }
+    var u = (USR && USR.ui) ? USR.ui : {};
+    return {
+      cache: !!u.cache, mem: !!u.mem, disk: !!u.disk, guard: !!u.guard
+    };
+  }
+
+  /* 首屏应用 uiDefault。remember 模式下不动 USR.ui（沿用上次）。 */
+  function applyUiDefault() {
+    if (!Settings || !USR) return;
+    if (USR.uiDefault === 'remember') return;
+    var st = initialCardState();
+    USR = Settings.normalize({
+      autoCollapse: USR.autoCollapse,
+      miniMetric: USR.miniMetric,
+      uiDefault: USR.uiDefault,
+      quotaGB: USR.quotaGB || 0,
+      ui: st,
+      crashGuard: USR.crashGuard,
+      reminders: USR.reminders
+    });
+    saveCfg();
+  }
 
   function applyCards() {
     for (var k in CARD_IDS) {
@@ -2256,6 +2461,7 @@
     USR = Settings.normalize({
       autoCollapse: USR.autoCollapse,
       miniMetric: USR.miniMetric,
+      uiDefault: USR.uiDefault,
       quotaGB: USR.quotaGB || 0,
       ui: ui,
       crashGuard: USR.crashGuard,
@@ -2370,7 +2576,8 @@
   function init() {
     loadCfg();
     migrateQuota();
-    applyCards();          // 首屏只有结论：四个主项的细节默认收起
+    applyUiDefault();    // 首屏视图：极简 / 完整 / 沿用上次（1.6.0 起可配置）
+    applyCards();        // 按 uiDefault 决定四个主项首屏是收起还是展开
     if (Settings && Reminder) {
       ENG = Reminder.create({});
       // 每秒跑一次纯计算，不读磁盘、不读系统，开销可以忽略
@@ -2484,6 +2691,15 @@
     $('dwClose').addEventListener('click', closeDrawer);
     $('mask').addEventListener('click', closeDrawer);
     $('drawer').addEventListener('change', applyDrawer);
+    // 数字框的 change 只在失焦/回车时才触发，摘要要实时更新就得听 input。
+    // 这里只更新摘要那行显示，不动 USR —— 避免边打字边写配置。
+    $('drawer').addEventListener('input', function (e) {
+      var t = e.target;
+      if (!t) return;
+      if (t.id === 'inWater' || t.id === 'inStand' || t.id === 'inEyes' || t.id === 'inMem') {
+        previewRemindSummary(t.id);
+      }
+    });
 
     $('dwReset').addEventListener('click', function () {
       if (!Settings) return;
@@ -2492,6 +2708,8 @@
       ST.quotaOverride = null;        // 上限也一起回到「自动检测」
       if (grd) grd.configure(USR.crashGuard);
       syncDrawer();
+      applyUiDefault();               // 默认视图也跟着回到「极简」
+      applyCards();
       computeMetrics();
       renderCache();
       updateAlert();
@@ -2507,6 +2725,15 @@
       dismissRemind();
       toast('10 分钟后再提醒');
     });
+
+    if ($('btnRemindPreset')) {
+      $('btnRemindPreset').addEventListener('click', applyRemindPreset);
+    }
+
+    if ($('rmTitle')) {
+      $('rmTitle').addEventListener('click', toggleRemindMsg);
+      $('rmTitle').style.cursor = 'pointer';
+    }
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && !$('drawer').hidden) closeDrawer();

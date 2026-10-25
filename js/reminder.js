@@ -67,6 +67,25 @@
     }
   }
 
+  /* 极简模式（小窗）用的短消息。
+     小窗只有 100~120px 宽，长句会把动作按钮挤出可视区。
+     所以这里只留"做了什么"的核心信息，细节靠标题承载。
+     1.6.0 新增。 */
+  function buildShortMessage(id, rc, ctx) {
+    ctx = ctx || {};
+    switch (id) {
+      case 'water':  return '喝两口水';
+      case 'stand':  return '站起来活动';
+      case 'eyes':   return '望远处 20 秒';
+      case 'mem':
+        return isFinite(ctx.memPct) ? ('占用 ' + ctx.memPct.toFixed(0) + '%') : '内存占用';
+      case 'memHigh':
+        return isFinite(ctx.memPct) ? ('已占用 ' + ctx.memPct.toFixed(0) + '%') : '内存偏高';
+      default:
+        return '';
+    }
+  }
+
   function make(id, rc, ctx) {
     var m = META[id] || { icon: '•', title: id };
     return {
@@ -74,7 +93,8 @@
       icon: m.icon,
       title: m.title,
       level: m.level || 'info',
-      msg: buildMessage(id, rc, ctx)
+      msg: buildMessage(id, rc, ctx),
+      shortMsg: buildShortMessage(id, rc, ctx)
     };
   }
 

@@ -228,5 +228,33 @@ console.log('\n[12] 渲染期间丢弃提醒，事后不补响');
   ok('渲染结束后不会瞬间连响', after.length === 0, after.length);
 }
 
+console.log('\n[9] 极简模式的短消息（1.6.0）');
+{
+  // 短消息必须在「同一条规则」下也存在，不能只对部分规则有
+  const ids = ['water', 'stand', 'eyes', 'mem', 'memHigh'];
+  const c = S.defaults();
+  ids.forEach(id => { c.reminders[id].on = true; });
+  const box = { t: 0 };
+  const eng = R.create({ now: () => box.t });
+  box.t = 61 * MIN;                     // 推进到能触发
+  const fired = eng.tick(c, { memPct: 77, memUsed: 1e9, memTotal: 2e9 });
+  ok('至少触发一条', fired.length > 0, fired.length);
+  fired.forEach(f => {
+    ok(`${f.id} 有 shortMsg`, typeof f.shortMsg === 'string' && f.shortMsg.length > 0, f.shortMsg);
+    ok(`${f.id} shortMsg 比 msg 短`, f.shortMsg.length < f.msg.length,
+       `${f.shortMsg.length} < ${f.msg.length}`);
+    ok(`${f.id} shortMsg 不含换行`, f.shortMsg.indexOf('\n') < 0);
+  });
+
+  // 短消息要带得上关键信息（内存类必须带百分比）
+  const memItem = fired.filter(f => f.id === 'mem')[0];
+  if (memItem) ok('内存短消息带百分比', /%/.test(memItem.shortMsg), memItem.shortMsg);
+  const highItem = fired.filter(f => f.id === 'memHigh')[0];
+  if (highItem) ok('内存偏高短消息带百分比', /%/.test(highItem.shortMsg), highItem.shortMsg);
+
+  // 完整消息不能被短消息覆盖（极简模式下还能点开看全文）
+  ok('msg 仍然是完整长句', fired[0].msg.length > fired[0].shortMsg.length);
+}
+
 console.log(`\n===== ${pass} 通过, ${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);

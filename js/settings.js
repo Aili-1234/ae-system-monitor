@@ -22,7 +22,11 @@
     autoCollapse: true,      // 面板变窄时自动折叠
     miniMetric: 'cache',     // 小窗显示：cache(缓存填充率) | mem(内存占用)
     quotaGB: 0,              // 手动设定的缓存上限；0 = 自动检测（优先读 AE 偏好）
-    // 四个主项的展开状态（true = 展示细节）；默认全收起，首屏只有结论
+    // 首屏视图：compact 全部收起(极简) / full 全部展开(完整) / remember 沿用上次的展开状态
+    // 1.6.0 新增。此前是硬编码"全部收起"，用户想看细节就得逐个点开。
+    uiDefault: 'compact',
+    // 四个主项的展开状态（true = 展示细节）
+    // uiDefault=remember 时读这里；compact/full 时由它决定首屏
     ui: {
       cache: false,
       mem:   false,
@@ -57,6 +61,7 @@
     autoCollapse: { type: 'bool' },
     miniMetric:   { type: 'enum', values: ['cache', 'mem'] },
     quotaGB:      { type: 'num', lo: 0, hi: 4000 },
+    uiDefault:    { type: 'enum', values: ['compact', 'full', 'remember'] },
     ui: {
       cache: { type: 'bool' },
       mem:   { type: 'bool' },

@@ -53,6 +53,16 @@ ok('on = false 被保留',
 ok('miniMetric 非法值退回 cache', S.normalize({ miniMetric: 'disk' }).miniMetric === 'cache');
 ok('miniMetric = mem 保留', S.normalize({ miniMetric: 'mem' }).miniMetric === 'mem');
 
+console.log('\n[4b] 首屏视图 uiDefault（1.6.0 新增）');
+ok('默认 compact（极简）', d.uiDefault === 'compact', d.uiDefault);
+ok('full 被保留', S.normalize({ uiDefault: 'full' }).uiDefault === 'full');
+ok('remember 被保留', S.normalize({ uiDefault: 'remember' }).uiDefault === 'remember');
+ok('非法值退回 compact', S.normalize({ uiDefault: 'wide' }).uiDefault === 'compact');
+ok('非字符串退回 compact', S.normalize({ uiDefault: 1 }).uiDefault === 'compact');
+ok('null 退回 compact', S.normalize({ uiDefault: null }).uiDefault === 'compact');
+ok('未设置时退回 compact', S.normalize({}).uiDefault === 'compact');
+ok('uiDefault 不影响 ui 本身', S.normalize({ uiDefault: 'full' }).ui.cache === false);
+
 console.log('\n[5] 未知字段被丢弃');
 const withExtra = S.normalize({ hack: 1, reminders: { water: { everyMin: 30, evil: 'x' } } });
 ok('顶层未知键丢弃', withExtra.hack === undefined);

@@ -192,10 +192,20 @@
           <option value="mem">内存占用</option>
         </select>
       </div>
+      <div class="row">
+        <label for="selUiDefault">首屏视图</label>
+        <select id="selUiDefault">
+          <option value="compact">极简（只显示结论）</option>
+          <option value="full">完整（展开全部细节）</option>
+          <option value="remember">沿用上次的展开状态</option>
+        </select>
+      </div>
+      <div class="hint">「极简」是首屏只留四个主项的结论、细节收起；「完整」一打开就把参数全铺开。随时可以用每张卡右上角的圆形按钮单独展开或收起。</div>
     </div>
 
     <div class="grp">
       <div class="grp-t">定时提醒</div>
+      <div class="hint" id="remindSummary">—</div>
 
       <div class="row">
         <input type="checkbox" id="cbWater" />
@@ -224,6 +234,12 @@
         <input type="number" id="inMem" min="5" max="240" step="1" />
         <span class="u">分</span>
       </div>
+
+      <div class="row">
+        <button class="ibtn sm" id="btnRemindPreset" title="一次设好三条身体提醒的常用间隔">按预设填入</button>
+        <span class="u" id="remindPresetHint">45 / 60 / 40 分</span>
+      </div>
+      <div class="hint">提醒是**静默**的：面板上出提示条，不会发声。</div>
     </div>
 
     <div class="grp">
@@ -316,17 +332,23 @@
   </div>
 </aside>
 
-<!-- ==================== 提醒条 ==================== -->
-<div class="remind" id="remindBar" hidden>
-  <span class="rm-ico" id="rmIco">•</span>
-  <div class="rm-txt">
-    <b id="rmTitle"></b>
-    <span id="rmMsg"></span>
+<!-- ==================== 底部堆叠区 ====================
+     提醒条与提示框共用一个底部容器：两者都在面板自己的显示框内，
+     而且不会互相盖住 —— 提醒在上、提示框在下。
+     放在 body 层（而不是 .app 内）是为了折叠成小窗时提示框依然可见。 -->
+<div class="bottom-stack" id="bottomStack">
+  <div class="remind" id="remindBar" hidden>
+    <span class="rm-ico" id="rmIco">•</span>
+    <div class="rm-txt">
+      <b id="rmTitle" title="点击查看完整提示">—</b>
+      <span id="rmMsg"></span>
+    </div>
+    <div class="rm-act">
+      <button id="rmSnooze">稍后 10 分</button>
+      <button id="rmOk">知道了</button>
+    </div>
   </div>
-  <div class="rm-act">
-    <button id="rmSnooze">稍后 10 分</button>
-    <button id="rmOk">知道了</button>
-  </div>
+  <div class="toast-host" id="toastHost"></div>
 </div>
 
 <script src="js/ae-cache.js"></script>
