@@ -171,7 +171,8 @@
   <!-- 1.7.0：包成两栏（左环右数值），面板变矮时用媒体查询横过来 -->
   <div class="mini-main">
   <button class="mini-ring" id="miniRing" title="点击展开">
-    <svg class="arc" viewBox="0 0 36 36" aria-hidden="true"><circle class="arc-bg" cx="18" cy="18" r="15.9155" /><circle class="arc-fg" cx="18" cy="18" r="15.9155" /></svg>
+    <!-- 1.7.2：小窗圆环改双层 —— 外圈只留轨道，进度画在内圈（r=12.6，周长 ≈79.17） -->
+    <svg class="arc" viewBox="0 0 36 36" aria-hidden="true"><circle class="arc-bg" cx="18" cy="18" r="15.9155" /><circle class="arc-fg" cx="18" cy="18" r="15.9155" /><circle class="arc-in" cx="18" cy="18" r="12.6" /></svg>
     <span id="miniPct">--</span>
   </button>
   <div class="mini-label"><svg class="mi" id="miMain" viewBox="0 0 10 10" aria-hidden="true"></svg><span id="miniLabel">缓存</span></div>
@@ -183,6 +184,8 @@
     <span class="ms" id="ms1"><span class="ms-h"><svg class="mi" id="mi1" viewBox="0 0 10 10" aria-hidden="true"></svg><i id="ml1">--</i></span><b id="mv1">--</b></span>
     <span class="ms" id="ms2"><span class="ms-h"><svg class="mi" id="mi2" viewBox="0 0 10 10" aria-hidden="true"></svg><i id="ml2">--</i></span><b id="mv2">--</b></span>
   </div>
+  <!-- 1.7.2b：按钮行留在右栏里（用户：「底下的两个小按钮还是按照之前的来安排」）——
+       放在两格下面、跟着右栏居中，而不是独立占一整行。 -->
   <div class="mini-row">
     <button class="ibtn sm" id="miniExpand" title="展开面板">↗</button>
     <button class="ibtn sm" id="miniCfg" title="设置">≡</button>

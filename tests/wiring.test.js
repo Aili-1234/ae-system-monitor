@@ -234,6 +234,7 @@ ok('字节字段仍留在 miBytes（没有一刀切全改 miGB，否则会把字
 console.log('\n[8f] 1.7.0：老 AE 兼容（CEP 8 / Chromium 57）+ 缩放不再有延迟 + 矮则横排');
 /* 注释里的 clamp()/conic-gradient 等字样不算，先剥掉注释再查。 */
 const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
+const htmlCode = html.replace(/<!--[\s\S]*?-->/g, '');   /* 注释会插在标签之间，位置类断言先剥注释 */
 ok('CSS 不再用 clamp()（Chromium 79+）', !/clamp\(/.test(cssCode));
 ok('CSS 不再用 inset 简写（Chromium 87+）', !/\binset:/.test(cssCode));
 ok('CSS 不再用 place-items', !/place-items/.test(cssCode));
@@ -274,8 +275,8 @@ ok('HTML 标签配平（1.7.0 踩过：小窗少一个 </div>，把设置抽屉�
    ['div', 'span', 'button', 'aside', 'svg'].every(tag => { const r = tagCount(html, tag); return r[0] === r[1]; }));
 ok('小窗两栏结构完整（.mini-main 与 .mini-side 都在 #miniView 闭合之前）',
    /<div class="mini"[^>]*>[\s\S]*?<div class="mini-main">[\s\S]*?<div class="mini-side">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/.test(html));
-ok('小窗两栏的归属正确：环 + 主显示名在 .mini-main，两格 + 按钮行在 .mini-side',
-   /<div class="mini-main">[\s\S]{0,400}?id="miniRing"[\s\S]{0,400}?id="miniLabel"[\s\S]{0,80}?<\/div>\s*<div class="mini-side">[\s\S]{0,400}?id="miniStats"[\s\S]{0,900}?<div class="mini-row">/.test(html));
+ok('小窗两栏归属正确：环 + 主显示名在 .mini-main，两格与按钮行都在 .mini-side 里（1.7.2b 按用户要求回退居中方案）',
+   /<div class="mini-main">[\s\S]{0,400}?id="miniRing"[\s\S]{0,400}?id="miniLabel"[\s\S]{0,80}?<\/div>\s*<div class="mini-side">[\s\S]{0,400}?id="miniStats"[\s\S]{0,700}?<div class="mini-row">[\s\S]{0,400}?<\/div>\s*<\/div>\s*<\/div>/.test(htmlCode));
 ok('环形图算术成立：r=15.9155 的周长 ≈100，stroke-dasharray:100 才配得上百分比',
    Math.abs(2 * Math.PI * 15.9155 - 100) < 0.1 && /\.arc-fg \{[^}]*stroke-dasharray: 100/.test(cssCode) &&
    /\.arc \{[^}]*transform: rotate\(-90deg\)/.test(cssCode));
@@ -285,34 +286,34 @@ ok('环尺寸连续（vh）且有上下限（min/max-width/height，不依赖 cl
    /--mini-ring: 30vh/.test(css) &&
    /\.mini-ring \{[\s\S]{0,300}?min-width: 44px[\s\S]{0,80}?min-height: 44px/.test(css) &&
    /max-width: 64px; max-height: 64px/.test(css));
-ok('间距/内边距/图标都连续（视口单位 + calc），图标尺寸随面板自动变化并夹在 6–9px',
+ok('间距/内边距/图标都连续（视口单位 + calc），图标尺寸随面板自动变化并夹在 7–9px（1.7.2 抬高下限）',
    /--mini-gap: calc\(4px \+ 1\.7vh\)/.test(css) &&
    /--mini-pad-y: calc\(3px \+ 2\.4vh\)/.test(css) &&
    /--mini-pad-x: calc\(3px \+ 1\.1vw\)/.test(css) &&
    /--mini-icon: calc\(5px \+ 1\.4vh\)/.test(css) &&
    /--mini-icon-gap: calc\(1px \+ 0\.4vh\)/.test(css) &&
-   /\.mini-label \.mi \{[\s\S]{0,260}?width: var\(--mini-icon\)[\s\S]{0,140}?min-width: 6px[\s\S]{0,90}?max-width: 9px/.test(css) &&
-   /\.mini-stats \.mi \{[\s\S]{0,260}?min-width: 6px[\s\S]{0,90}?max-width: 9px/.test(css));
+   /\.mini-label \.mi \{[\s\S]{0,260}?width: var\(--mini-icon\)[\s\S]{0,140}?min-width: 7px[\s\S]{0,90}?max-width: 9px/.test(css) &&
+   /\.mini-stats \.mi \{[\s\S]{0,260}?min-width: 7px[\s\S]{0,90}?max-width: 9px/.test(css));
 ok('离散尺寸断点已删除（横排断点与窄档窄化保留）',
    !/@media \(max-height: 200px\)/.test(css) &&
    !/@media \(max-height: 160px\)/.test(css) &&
    !/@media \(max-width: 170px\)/.test(css) &&
    /@media \(max-height: 170px\) and \(min-width: 150px\)/.test(css));
-ok('小窗图标色比正文暗一档、边缘有深蓝描边，且告警态仍覆盖（琥珀/红）',
-   /--mini-ico: #6e6e6e/.test(css) &&
-   /--mini-ico-edge: #1d3557/.test(css) &&
-   /\.mini-label \.mi \{[\s\S]{0,600}?stroke: var\(--mini-ico\)/.test(css) &&
-   /\.mini-label \.mi \{[\s\S]{0,600}?filter: drop-shadow\(0\.5px 0 var\(--mini-ico-edge\)\)/.test(css) &&
-   /\.mini-stats \.mi \{[\s\S]{0,600}?stroke: var\(--mini-ico\)/.test(css) &&
-   /\.mini-stats \.mi \{[\s\S]{0,600}?filter: drop-shadow\(0\.5px 0 var\(--mini-ico-edge\)\)/.test(css) &&
-   /\.mini-stats \.ms\.on \.mi \{ stroke: var\(--warn\); \}/.test(css) &&
-   /\.mini-stats \.ms\.bad \.mi \{ stroke: var\(--bad\); \}/.test(css));
-ok('主显示「缓存已用」图标换成层叠横条（三片错开、长度递减，刻意不等长以免与设置按钮 ≡ 撞脸），不再用叠层圆柱',
-   /cache: '<path d="M1\.2 2\.6h7\.6"\/><path d="M2\.5 5h6\.3"\/><path d="M3\.8 7\.4h3\.9"\/>'/.test(mainJs) &&
-   !/cache: '<ellipse/.test(mainJs));
+ok('小窗图标改实心、颜色跟随主题（1.7.2 去掉深蓝边缘描边），告警态仍覆盖（琥珀/红）',
+   /--mini-ico: #8a8a8a/.test(css) &&
+   !/--mini-ico-edge: #1d3557/.test(css) &&
+   /\.mini-label \.mi \{[\s\S]{0,600}?fill: currentColor; stroke: none; color: var\(--mini-ico\);/.test(css) &&
+   /\.mini-stats \.mi \{[\s\S]{0,600}?fill: currentColor; stroke: none; color: var\(--mini-ico\);/.test(css) &&
+   !/drop-shadow\(0\.5px 0 var\(--mini-ico-edge\)\)/.test(css) &&
+   /\.mini-stats \.ms\.on \.mi \{ color: var\(--warn\); \}/.test(css) &&
+   /\.mini-stats \.ms\.bad \.mi \{ color: var\(--bad\); \}/.test(css) &&
+   /fill="currentColor"/.test(mainJs));
+ok('主显示「缓存已用」图标是**实心**层叠块（1.7.2：细线在 6~9px 下糊成一团），不再用细线/圆柱',
+   /cache: '<rect x="1\.2" y="1\.9" width="7\.6" height="1\.7" rx="\.85" fill="currentColor"\/>/.test(mainJs) &&
+   !/cache: '<ellipse/.test(mainJs) && !/M1\.2 2\.6h7\.6/.test(mainJs));
 
 
-console.log('\n[8h] 面板主题（1.7.1：5 套深色主题，顶部色点 + 抽屉一行两处联动）');
+console.log('\n[8h] 面板主题（1.7.1 五套深色 → 1.7.2 八套：两套浅色 + 一套黑；顶部色点 + 抽屉一行两处联动）');
 
 /* 对比度是算出来的，不是看出来的 —— 深色主题最容易出的问题就是某个色在深底上糊成一团。 */
 const wCss = css.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -345,7 +346,7 @@ function wThemeVars(text) {
   return out;
 }
 const wVars = wThemeVars(wCss);
-const wThemes = ['mint', 'azure', 'lotus', 'gray', 'pink'];
+const wThemes = ['mint', 'azure', 'lotus', 'gray', 'pink', 'ivory', 'mist', 'black'];
 
 function wPicked() {
   return wThemes.map(t => Object.assign({}, wVars.mint, wVars[t] || {}));
@@ -382,18 +383,54 @@ ok('主题写到 body 的 data-theme 上（CSS 只认这个属性）', /setAttri
 ok('两处控件用同一套事件委托（动态生成的色点不能逐个挂 listener）',
   /function themePick\(/.test(mainJs) && /\$\('themePop'\)\.addEventListener\('click', themePick\)/.test(mainJs) &&
   /\$\('themeRow'\)\.addEventListener\('click', themePick\)/.test(mainJs));
-ok('CSS 里有四套主题块（薄荷绿是 :root 默认那套，不重复写一块）',
-  ['azure', 'lotus', 'gray', 'pink'].every(t => wCss.indexOf('body[data-theme="' + t + '"]') >= 0));
+ok('CSS 里有七套主题块（薄荷绿是 :root 默认那套，不重复写一块）',
+  ['azure', 'lotus', 'gray', 'pink', 'ivory', 'mist', 'black'].every(t => wCss.indexOf('body[data-theme="' + t + '"]') >= 0));
 ok('CSS 里颜色只出现在变量定义里（别处一律 var()，否则换主题会露出旧底色）',
   wHexOutsideVars().length === 0, wHexOutsideVars().join(' | '));
-ok('每套主题都覆盖了小窗图标色与描边（否则换主题后小窗图标还是旧色）',
-  wThemes.every(t => (wVars[t] || {})['--mini-ico'] && (wVars[t] || {})['--mini-ico-edge']));
+ok('每套主题都覆盖了小窗图标色（1.7.2 起图标颜色只跟主题走，不再有固定描边色）',
+  wThemes.every(t => (wVars[t] || {})['--mini-ico']));
 ok('每套主题的关键文字色对底色对比度 ≥ 4.5（正文/次要/告警/危险）',
   wWorst(['--fg', '--fg-2', '--fg-3', '--ok', '--warn', '--bad']).ratio >= 4.5,
   '最差 ' + wWorst(['--fg', '--fg-2', '--fg-3', '--ok', '--warn', '--bad']).name + ' ' +
   wWorst(['--fg', '--fg-2', '--fg-3', '--ok', '--warn', '--bad']).ratio.toFixed(2));
 ok('进度条中性色对底色至少可见（≥ 2，它不是文字）', wWorst(['--accent']).ratio >= 2,
   '最差 ' + wWorst(['--accent']).name + ' ' + wWorst(['--accent']).ratio.toFixed(2));
+
+console.log('\n[8i] 1.7.2：双层环 + 图标实心跟随主题 + 数值同行 + 按钮居中 + 切换淡入淡出 + 八套主题');
+ok('小窗圆环改成双层：外圈只留更暗的轨道，进度画在内圈（r=12.6，周长 ≈79.17）',
+   /\.mini-ring \.arc-bg \{ stroke: var\(--bg-hi\); \}/.test(css) &&
+   /\.mini-ring \.arc-fg \{ display: none; \}/.test(css) &&
+   /\.mini-ring \.arc-in \{[\s\S]{0,200}?stroke-dasharray: 79\.17[\s\S]{0,80}?stroke-dashoffset: 79\.17/.test(css) &&
+   /class="arc-in"/.test(html) &&
+   Math.abs(2 * Math.PI * 12.6 - 79.17) < 0.05);
+ok('内圈进度由 setArc 写（主面板那个单圈不受影响 —— 只在 .arc-in 存在时才写）',
+   /var inner = ring\.querySelector\('\.arc-in'\)/.test(mainJs) &&
+   /inner\.style\.strokeDashoffset = \(79\.17 \* \(1 - v \/ 100\)\)\.toFixed\(2\);/.test(mainJs));
+ok('小窗图标全部改实心（细线在 6~9px 下糊成一团），颜色走 currentColor 跟随主题',
+   (mainJs.match(/fill="currentColor"/g) || []).length >= 4 &&
+   /fill: currentColor; stroke: none; color: var\(--mini-ico\);/.test(css));
+ok('图标尺寸下限抬到 7px，且极窄档不再把图标收成 0（那条规则正是「看不见」的元凶）',
+   /min-width: 7px; min-height: 7px/.test(css) &&
+   !/--mini-icon: 0px/.test(css) && !/--mini-icon-gap: 0px/.test(css));
+ok('两格数值挪到标签同一行（每格从两行变一行）',
+   /\.mini-stats \.ms \{ flex: 0 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; \}/.test(css) &&
+   /\.mini-stats \.ms > \* \+ \* \{ margin-top: 0; margin-left: 4px; \}/.test(css));
+ok('窄面板（≤180px）每格数值回到标签下面，且两格**并排**不堆叠（96×132 堆叠会被裁底部）',
+   /@media \(max-width: 180px\) \{[\s\S]{0,420}?\.mini-stats \{ flex-direction: row; align-items: flex-start; \}[\s\S]{0,400}?\.mini-stats \.ms \{ flex-direction: column; align-items: flex-start; \}[\s\S]{0,200}?\.mini-stats \.ms \+ \.ms \{ margin-left: var\(--mini-gap-x\); margin-top: 0; \}/.test(css));
+ok('底部按钮行留在右栏、跟着两格居中（1.7.2b 按用户要求回到「之前那样」）',
+   /\.mini-row \{ display: flex; \}/.test(css) &&
+   /\.mini-side \.mini-row \{ margin-top: var\(--mini-gap\); \}/.test(css) &&
+   /<div class="mini-side">[\s\S]{0,600}?id="miniStats"[\s\S]{0,700}?<div class="mini-row">[\s\S]{0,400}?<\/div>\s*<\/div>\s*<\/div>/.test(htmlCode) &&
+   /\.mini-side \.mini-row \{ margin-top: 4px; \}/.test(css));
+ok('切换时淡入淡出（折叠/展开、换主题、横竖排），拖动仍零补间（只有颜色进 transition）',
+   /@keyframes vFade/.test(css) &&
+   /body\.compact \.mini \{ animation: vFade \.2s ease; \}/.test(css) &&
+   /transition: background-color \.22s ease, color \.22s ease, border-color \.22s ease;/.test(css) &&
+   !/\.mini \{[\s\S]{0,240}?transition:/.test(cssCode));
+ok('主题从 5 套加到 8 套（新增象牙白 ivory、雾蓝浅 mist、黑色 black）',
+   /var THEMES = \['mint', 'azure', 'lotus', 'gray', 'pink', 'ivory', 'mist', 'black'\];/.test(settings) &&
+   ['ivory', 'mist', 'black'].every(t => wCss.indexOf('body[data-theme="' + t + '"]') >= 0) &&
+   /THEME_LABELS = \{[\s\S]{0,200}?black: '黑色'/.test(settings));
 
 console.log('\n[9] manifest 允许折叠成窄条 / 版本覆盖');
 ok('MinSize 宽度 <= 120', /<Width>(\d+)<\/Width>/.test(manifest) &&
@@ -629,7 +666,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 276;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 286;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -675,16 +712,18 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「18 组、1003 项断言」',
-     /18 组、\*\*1003 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1003/1003（不是旧数）',
-     /必须 1003\/1003/.test(report));
+  ok('PLUGIN-REPORT 声明「18 组、1016 项断言」',
+     /18 组、\*\*1016 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1016/1016（不是旧数）',
+     /必须 1016\/1016/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
   ok('CHANGELOG 的 1.7.1 条目写 1003 项',
      /## 1\.7\.1[\s\S]*?1003 项/.test(changelog));
-  ok('README 写 1003 项', /1003 项/.test(readme));
+  ok('CHANGELOG 的 1.7.2 条目写 1016 项',
+     /## 1\.7\.2[\s\S]*?1016 项/.test(changelog));
+  ok('README 写 1016 项', /1016 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

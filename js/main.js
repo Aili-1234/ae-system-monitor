@@ -690,11 +690,16 @@
   function setArc(ringId, pct, col) {
     var ring = $(ringId);
     if (!ring || !ring.querySelector) return;
-    var fg = ring.querySelector('.arc-fg');
-    if (!fg) return;
     var v = isFinite(pct) ? clamp(pct, 0, 100) : 0;
-    fg.style.strokeDashoffset = (100 - v).toFixed(2);
-    fg.style.stroke = col || '';
+    var fg = ring.querySelector('.arc-fg');
+    if (fg) {
+      fg.style.strokeDashoffset = (100 - v).toFixed(2);
+      fg.style.stroke = col || '';
+    }
+    /* 1.7.2：小窗改成「双层环」—— 进度画在**内圈**（r=12.6，周长 2πr ≈ 79.17），
+       外圈只留一条更暗的轨道。主面板那个环仍是单圈，所以这里只在 .arc-in 存在时才写。 */
+    var inner = ring.querySelector('.arc-in');
+    if (inner) inner.style.strokeDashoffset = (79.17 * (1 - v / 100)).toFixed(2);
   }
 
   /* ---------------- 渲染：内存 ---------------- */
@@ -739,13 +744,17 @@
    * 也刻意不引图标字体：多一个外部依赖就多一种「这里怎么空白了」的可能。
    */
   var MI_ICONS = {
-    cache: '<path d="M1.2 2.6h7.6"/><path d="M2.5 5h6.3"/><path d="M3.8 7.4h3.9"/>',   /* 1.7.1：层叠横条（三片向左下错开、长度递减），替掉叠层圆柱 */
-    mem:   '<rect x="2.4" y="2.4" width="5.2" height="5.2" rx="1"/><path d="M4 2.4V1M6 2.4V1M4 9V7.6M6 9V7.6M2.4 4H1M2.4 6H1M9 4H7.6M9 6H7.6"/>',
-    need:  '<path d="M1.4 8.4h7.2"/><path d="M5 7V2"/><path d="M3.2 3.8 5 2l1.8 1.8"/>',
-    disk:  '<circle cx="5" cy="5" r="3.5"/><circle cx="5" cy="5" r="1.1"/>',
-    left:  '<rect x="1" y="3" width="6.2" height="4.4" rx="1"/><path d="M8.5 4.6v1.6"/><path d="M2.6 4.4h2.2v2.6H2.6z"/>',
-    rate:  '<path d="M1.4 7.8 3.8 5.2l1.9 1.7 2.8-3.7"/><path d="M6.3 3.2h2.2v2.2"/>',
-    eta:   '<circle cx="5" cy="5" r="3.5"/><path d="M5 3v2.2l1.7 1.1"/>'
+    /* 1.7.2：小窗图标全部改**实心** —— 细线图标在 6~9px 下糊成一团（用户：「第二个确实看不见」）。
+       颜色一律走 CSS 的 color（fill/stroke 用 currentColor），所以**跟着主题走**：
+       常态取 --mini-ico（7 套主题各一套值），告警态由 .ms.on / .ms.bad 换 color。
+       1.7.2 同时去掉 1.7.1 的深蓝边缘描边（用户：「图标深蓝色描边去了」）。 */
+    cache: '<rect x="1.2" y="1.9" width="7.6" height="1.7" rx=".85" fill="currentColor"/><rect x="2.5" y="4.15" width="6.3" height="1.7" rx=".85" fill="currentColor"/><rect x="3.8" y="6.4" width="3.9" height="1.7" rx=".85" fill="currentColor"/>',
+    mem:   '<rect x="1.3" y="2.7" width="7.4" height="4.6" rx="1" fill="currentColor"/>',
+    need:  '<path d="M5 1.5 8.1 4.9H6.4v3H3.6v-3H1.9z" fill="currentColor"/><rect x="1.6" y="8.1" width="6.8" height="1.5" rx=".75" fill="currentColor"/>',
+    disk:  '<path d="M5 1.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2zm0 2.2a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 0 1 0-2.8z" fill="currentColor" fill-rule="evenodd"/>',
+    left:  '<rect x="1.2" y="2.9" width="6.1" height="4.2" rx="1" fill="currentColor"/><rect x="7.7" y="4.4" width="1.3" height="1.2" rx=".4" fill="currentColor"/>',
+    rate:  '<path d="M1.4 7.9 3.9 5.2l1.9 1.7 2.9-3.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.4 3.1h2.4v2.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>',
+    eta:   '<circle cx="5" cy="5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5 3.1v2.1l1.6 1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
   };
 
   // Settings 万一没加载出来，也要显示得出中文而不是裸的键名
@@ -755,7 +764,7 @@
     disk_free_gb: '磁盘可用', enough: '盘够装吗', rate: '缓存增速', eta: '多久写满', none: '不显示'
   };
 
-  // cache_pct / cache_gb 落到同一个层叠横条图标（1.7.1 由叠层圆柱换成三片错位横条）
+  // cache_pct / cache_gb 落到同一个「实心层叠块」图标（1.7.1 三片细线 → 1.7.2 三片实心）
   function miIconKey(key) { return String(key || '').replace(/_(pct|gb)$/, ''); }
   function miIcon(key) { return MI_ICONS[miIconKey(key)] || ''; }
 

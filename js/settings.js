@@ -82,13 +82,22 @@
    * 藕紫 灰色和淡粉色」。定稿五套都是**深色底**（"薄荷绿 = 现在这版"这句定了调），
    * 只换强调色系 + 一点点底色色温；语义色 warn（琥珀）/ bad（红）保留，只做轻微色温偏移。
    * 「薄荷绿」就是默认那套（css 的 :root），所以它没有 body[data-theme="mint"] 块。
-   * 色点颜色 THEME_DOTS 只在界面画圆点用，和 CSS 里的强调色一一对应。 */
-  var THEMES = ['mint', 'azure', 'lotus', 'gray', 'pink'];
+   * 色点颜色 THEME_DOTS 只在界面画圆点用，和 CSS 里的强调色一一对应。
+   * 1.7.2（用户：「主题可以再加两个浅色底」「颜色再加一个黑色适配 ae 原生主题」）：
+   * 加到 8 套 —— 新增象牙白 ivory、雾蓝浅 mist（两套**浅色底**）与黑色 black（纯黑 + AE 原生
+   * 那种灰蓝高亮，最靠近 AE 自己的深色界面）；深色那五套一行不动。
+   * 浅色底不是把底色翻白就完事：灰阶必须整体下压（#999999 放在白底上只有 1.6:1），
+   * 所以浅色主题另给一套 fg/fg-2/fg-3 与语义色，由 [8h] 的对比度实算断言卡住。
+   * 这两套浅色的色点直接用**它自己的底色**，与深色六套（色点 = 强调色/中性灰）刻意不同 ——
+   * 一眼就能认出「这套是浅色」。 */
+  var THEMES = ['mint', 'azure', 'lotus', 'gray', 'pink', 'ivory', 'mist', 'black'];
   var THEME_LABELS = {
-    mint: '薄荷绿', azure: '天青蓝', lotus: '藕紫', gray: '灰色', pink: '淡粉'
+    mint: '薄荷绿', azure: '天青蓝', lotus: '藕紫', gray: '灰色', pink: '淡粉',
+    ivory: '象牙白', mist: '雾蓝浅', black: '黑色'
   };
   var THEME_DOTS = {
-    mint: '#7fbf9a', azure: '#63b3d4', lotus: '#a99ad0', gray: '#a8a8a8', pink: '#dda3b8'
+    mint: '#7fbf9a', azure: '#63b3d4', lotus: '#a99ad0', gray: '#a8a8a8', pink: '#dda3b8',
+    ivory: '#f6f3ee', mist: '#eef2f6', black: '#6b6b6b'
   };
 
   var MINI_MAIN = ['cache_pct', 'mem_free_pct', 'need_pct', 'disk_free_pct'];

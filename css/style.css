@@ -31,10 +31,11 @@
   --sbar:    #303030;   /* 页面滚动条 */
   --sbar-hi: #3d3d3d;
   --sbar-2:  #2e2e2e;   /* 抽屉滚动条 */
-  --mini-ico: #6e6e6e;                   /* 小窗图标色：比 --fg-3(#999) 暗一档（用户：颜色暗一些）。
-                                             1.7.1 起放在这里而**不是** .mini 里 —— 放 .mini 会被元素自身声明挡住，
-                                             主题块 body[data-theme] 覆盖不下来 */
-  --mini-ico-edge: #1d3557;              /* 图标边缘描边（深蓝）：把暗灰图标从深底上"提"出来（用户：边缘描边增强对比） */
+  --mini-ico: #8a8a8a;                   /* 小窗图标色（1.7.2：从 #6e6e6e 回调一档 —— 用户说「看不见」，
+                                             但底色仍然靠主题；它不是固定值：7 套主题各给一套）。
+                                             放在这里而**不是** .mini 里 —— 放 .mini 会被元素自身声明挡住，
+                                             主题块 body[data-theme] 覆盖不下来。
+                                             1.7.2 同时删掉 --mini-ico-edge：用户要求去掉深蓝边缘描边。 */
 }
 
 /* ---------------- 面板主题（1.7.1，用户：多加几个主题） ----------------
@@ -49,7 +50,7 @@ body[data-theme="azure"] {   /* 天青蓝 */
   --ok: #63b3d4; --warn: #d3a45f; --bad: #cf7f86; --accent: #4d7488;
   --pop-bg: #1b242c; --pop-fg: #f5f8fb; --pop-hi: #25313a;
   --sbar: #25313a; --sbar-hi: #31414d; --sbar-2: #233039;
-  --mini-ico: #6d8494; --mini-ico-edge: #123a52;
+  --mini-ico: #8aa6b8;
 }
 
 body[data-theme="lotus"] {   /* 藕紫 */
@@ -59,7 +60,7 @@ body[data-theme="lotus"] {   /* 藕紫 */
   --ok: #a99ad0; --warn: #cba55f; --bad: #cf8098; --accent: #6b5c8a;
   --pop-bg: #221c2c; --pop-fg: #f6f2fa; --pop-hi: #2a2335;
   --sbar: #2a2335; --sbar-hi: #382f47; --sbar-2: #271f31;
-  --mini-ico: #7d728f; --mini-ico-edge: #3a2a5c;
+  --mini-ico: #a598c0;
 }
 
 body[data-theme="gray"] {    /* 灰色 */
@@ -69,7 +70,7 @@ body[data-theme="gray"] {    /* 灰色 */
   --ok: #a8a8a8; --warn: #c9a35e; --bad: #c97070; --accent: #7e7e7e;
   --pop-bg: #2b2b2b; --pop-fg: #f5f5f5; --pop-hi: #383838;
   --sbar: #2e2e2e; --sbar-hi: #3d3d3d; --sbar-2: #2b2b2b;
-  --mini-ico: #8a8a8a; --mini-ico-edge: #4a4a4a;
+  --mini-ico: #a8a8a8;
 }
 
 body[data-theme="pink"] {    /* 淡粉 */
@@ -79,7 +80,45 @@ body[data-theme="pink"] {    /* 淡粉 */
   --ok: #dda3b8; --warn: #d2a763; --bad: #d97f8c; --accent: #8d6b78;
   --pop-bg: #281e23; --pop-fg: #faf3f6; --pop-hi: #302228;
   --sbar: #302228; --sbar-hi: #3f2e36; --sbar-2: #2c2026;
-  --mini-ico: #977f88; --mini-ico-edge: #5b1f3a;
+  --mini-ico: #c09aa8;
+}
+
+/* ---------------- 1.7.2 新增三套主题（用户：「主题可以再加两个浅色底」＋「颜色再加一个黑色适配 ae 原生主题」） ----------------
+   两套浅色底不是"把底色翻白"就完事：深色主题里 --fg-3 用 #999999，放到白底上只有 1.6:1，
+   完全看不清。所以这两套把**整套灰阶与语义色都往下压**（--fg-3 到 #6b6b6b / #5a6a76 这一档），
+   并把在深底上够用的 --ok/--warn/--bad 换成更深的同色系 —— 门槛由 [8h] 的对比度实算断言卡住
+   （六个语义色对各自 --bg 最差 ≥ 4.5:1）。弹层/抽屉/滚动条全部走既有变量，不需要另写逻辑。
+   第三套 black 是**纯黑 + AE 原生那种灰蓝高亮**：底色比默认薄荷绿更深（#131313 vs #1a1a1a），
+   强调色取 AE 深色界面里那种偏灰的蓝（#5c8fb8，不是天青蓝那种亮青），整体更靠近 AE 自己的深色 UI。 */
+body[data-theme="ivory"] {   /* 象牙白（暖白纸感） */
+  --bg: #f6f3ee; --bg-hi: #ffffff; --bg-lo: #efeae3; --bg-lo2: #f3efe8;
+  --fg: #2b2b2b; --fg-2: #5f5f5f; --fg-3: #6b6b6b;
+  --line: #e2ddd4; --line-2: #cfc9c0;
+  --ok: #2f7a52; --warn: #8a5f16; --bad: #a33a34; --accent: #8a8a8a;
+  --pop-bg: #ffffff; --pop-fg: #1f1f1f; --pop-hi: #f0ece5;
+  --sbar: #d8d3ca; --sbar-hi: #c9c3b9; --sbar-2: #ded8cf;
+  --mini-ico: #6b6b6b;
+}
+
+body[data-theme="mist"] {    /* 雾蓝浅（冷灰蓝，接近 AE 浅色 UI） */
+  --bg: #eef2f6; --bg-hi: #ffffff; --bg-lo: #e7ecf1; --bg-lo2: #ebeff4;
+  --fg: #1f2a33; --fg-2: #4a5a66; --fg-3: #5a6a76;
+  --line: #d7dfe6; --line-2: #c3ccd4;
+  --ok: #1f6f97; --warn: #8a5f16; --bad: #a33a34; --accent: #7a8894;
+  --pop-bg: #ffffff; --pop-fg: #16202a; --pop-hi: #e9eef3;
+  --sbar: #cdd6de; --sbar-hi: #bcc7d1; --sbar-2: #d4dce3;
+  --mini-ico: #5f6b75;
+}
+
+body[data-theme="black"] {   /* 黑色（适配 AE 原生深色 UI）—— 用户：「颜色再加一个黑色适配 ae 原生主题」 */
+  --bg: #131313; --bg-hi: #1e1e1e; --bg-lo: #161616; --bg-lo2: #1a1a1a;
+  --fg: #d6d6d6; --fg-2: #9a9a9a; --fg-3: #808080;
+  --line: #2a2a2a; --line-2: #3a3a3a;
+  /* AE 深色界面里那种偏灰的蓝（不是天青蓝那种亮青）——6.5:1 对 --bg */
+  --ok: #5c8fb8; --warn: #c9a35e; --bad: #c97070; --accent: #7a7a7a;
+  --pop-bg: #1e1e1e; --pop-fg: #eaeaea; --pop-hi: #2a2a2a;
+  --sbar: #2a2a2a; --sbar-hi: #383838; --sbar-2: #262626;
+  --mini-ico: #9a9a9a;
 }
 
 * { box-sizing: border-box; }
@@ -822,7 +861,10 @@ body.compact .mini {
 }
 /* 1.7.0 小窗分两栏：左 .mini-main（环 + 主显示名）、右 .mini-side（两格 + 按钮）。
    竖排时两栏上下叠（间距还是 --mini-gap），横排由下面的媒体查询切。 */
-.mini-main, .mini-side { display: flex; flex-direction: column; align-items: center; }
+.mini-main, .mini-side {
+  display: flex; flex-direction: column; align-items: center;
+  max-width: 100%;   /* 1.7.2f：让内部 max-width:100% 解析到 .mini 的内容盒，而不是自己 */
+}
 .mini-main .mini-label { margin-top: var(--mini-gap); }
 .mini-main + .mini-side { margin-top: var(--mini-gap); }
 .mini-side .mini-row { margin-top: var(--mini-gap); }
@@ -839,7 +881,17 @@ body.compact .mini {
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
 }
-.mini-ring .arc circle { stroke-width: 2.25; }
+.mini-ring .arc circle { stroke-width: 1.2; }   /* 1.7.2：整体细一档（用户：嫌它粗、亮） */
+/* 1.7.2：小窗圆环改「双层环」（用户在 6 个候选里选了 D）——
+   外圈只留一条更暗的轨道（--bg-hi，比原来的 --line 还暗一档），
+   进度改画在**内圈**（r=12.6，周长 2πr ≈ 79.17，dasharray/offset 由 main.js 的 setArc 写）。
+   告警语义不变：--rc 仍是琥珀/红，换图案不改「红 = 危险」。 */
+.mini-ring .arc-bg { stroke: var(--bg-hi); }
+.mini-ring .arc-fg { display: none; }
+.mini-ring .arc-in {
+  fill: none; stroke: var(--rc, var(--fg-2)); stroke-width: 1.2;
+  stroke-dasharray: 79.17; stroke-dashoffset: 79.17;
+}
 .mini-ring > span {
   position: relative; z-index: 1;
   font-size: 12.5px; font-weight: 400;
@@ -864,11 +916,10 @@ body.compact .mini {
 .mini-label > * + * { margin-left: 3px; }
 .mini-label .mi {
   width: var(--mini-icon); height: var(--mini-icon); flex: 0 0 auto;
-  min-width: 6px; min-height: 6px; max-width: 9px; max-height: 9px;   /* 1.7.1：图标随面板自动变化，但夹在 6–9px */
-  /* 边缘描边（深蓝）：SVG 描边没法"外描边"，用四方 0.5px 投影拼出一圈深蓝边。
-     drop-shadow 在 Chromium 18+ 就有（CEP 8 也认），不动 JS、不改图标路径。 */
-  filter: drop-shadow(0.5px 0 var(--mini-ico-edge)) drop-shadow(-0.5px 0 var(--mini-ico-edge)) drop-shadow(0 0.5px var(--mini-ico-edge)) drop-shadow(0 -0.5px var(--mini-ico-edge));
-  fill: none; stroke: var(--mini-ico); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
+  min-width: 7px; min-height: 7px; max-width: 9px; max-height: 9px;   /* 1.7.2：下限 6→7px（用户：第二个图标看不见） */
+  /* 1.7.2：去掉 1.7.1 的深蓝边缘描边（用户：「图标深蓝色描边去了」）。
+     图标改实心，颜色**跟随主题** —— fill 走 currentColor，color 取 --mini-ico。 */
+  fill: currentColor; stroke: none; color: var(--mini-ico);
 }
 /* 小窗占用行：左缓存、右内存，**整组居中**并各带一个图标（用户：往中间靠一点、带些图标）。
    gap 跟面板宽度连续缩放：200px 上 16px、96px 收到 5.6px；宽度不足 114px 时两格的
@@ -876,28 +927,29 @@ body.compact .mini {
    （旧版 width:100% + space-between + 右列 text-align:right，把两列顶到面板两侧。） */
 .mini-stats {
   max-width: 100%;
-  display: flex; align-items: flex-end; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   font-variant-numeric: tabular-nums;
 }
 .mini-stats .ms + .ms { margin-left: var(--mini-gap-x); }
 /* 没选指标的那一格（以及两格都没选时的整行）不占位置。
    注意 .mini-stats 自己有 display:flex，会压过 UA 的 [hidden]{display:none}，必须显式写。 */
 .mini-stats[hidden], .mini-stats .ms[hidden] { display: none; }
-.mini-stats .ms { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; }
-.mini-stats .ms > * + * { margin-top: 1px; }
+/* 1.7.2：数值挪到标签**同一行**（用户：「右边纤细数据可以移到文字后面」）——
+   每格从两行变一行，短面板上省下一整行高度。 */
+.mini-stats .ms { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; }
+.mini-stats .ms > * + * { margin-top: 0; margin-left: 4px; }
 .mini-stats .ms-h { display: flex; align-items: center; min-width: 0; }
 /* 图标与文字之间原本靠 flex gap（Chromium 84+），改成 i 的 margin-left：
    图标宽度在窄档会被断点收到 0，margin 也跟着变量一起收，不需要额外断点。 */
 .mini-stats .ms-h i { margin-left: var(--mini-icon-gap); }
 .mini-stats .mi {
   width: var(--mini-icon); height: var(--mini-icon); flex: 0 0 auto;
-  min-width: 6px; min-height: 6px; max-width: 9px; max-height: 9px;   /* 1.7.1：同上，图标自动变化并夹住 */
-  /* 同上：一圈深蓝边缘描边，增强与深底的对比 */
-  filter: drop-shadow(0.5px 0 var(--mini-ico-edge)) drop-shadow(-0.5px 0 var(--mini-ico-edge)) drop-shadow(0 0.5px var(--mini-ico-edge)) drop-shadow(0 -0.5px var(--mini-ico-edge));
-  fill: none; stroke: var(--mini-ico); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
+  min-width: 7px; min-height: 7px; max-width: 9px; max-height: 9px;   /* 1.7.2：同上 */
+  /* 同上：实心 + 颜色跟随主题，没有描边投影 */
+  fill: currentColor; stroke: none; color: var(--mini-ico);
 }
-.mini-stats .ms.on .mi { stroke: var(--warn); }
-.mini-stats .ms.bad .mi { stroke: var(--bad); }
+.mini-stats .ms.on .mi { color: var(--warn); }   /* 1.7.2：图标改实心后，告警态换的是 color 而不是 stroke */
+.mini-stats .ms.bad .mi { color: var(--bad); }
 .mini-stats i {
   font-style: normal; font-size: 8px;
   color: var(--fg-3); letter-spacing: .06em;
@@ -910,6 +962,9 @@ body.compact .mini {
 .mini-stats .ms.on b { color: var(--warn); }
 .mini-stats .ms.bad b { color: var(--bad); }
 
+/* 1.7.2b：按钮行留在右栏里（用户：「底下的两个小按钮还是按照之前的来安排」）——
+   放在两格下面、跟着右栏居中，不独立占一整行。
+   位置由下面那条 .mini-side .mini-row 给间距。 */
 .mini-row { display: flex; }
 .mini-row > * + * { margin-left: 2px; }
 
@@ -1246,11 +1301,34 @@ body:not(.compact) .remind::-webkit-scrollbar-thumb {
   .mini-side { align-items: flex-start; }
   .mini-side .mini-stats { flex-direction: column; align-items: flex-start; }
   .mini-side .mini-stats .ms + .ms { margin-left: 0; margin-top: 1px; }
-  .mini-side .ms { align-items: flex-start; }
+  /* 横排时右栏只有一格宽，数值换到标签下面（与竖向窄档一致） */
+  .mini-side .ms { align-items: flex-start; flex-direction: column; }
+  .mini-side .ms > * + * { margin-top: 1px; margin-left: 0; }
   .mini-side .mini-row { margin-top: 4px; }
+  /* 横排↔竖排是一次「切换」，给这一档加上淡入（离开这一档动画自然消失，不会在拖动中反复播） */
+  body.compact .mini-main, body.compact .mini-side, body.compact .mini-row { animation: vFade .22s ease; }
+}
+@media (max-width: 180px) {
+  /* 1.7.2b（用户给了窄档的样子）：窄面板上一行塞不下「图标 + 四个字 + 数值」→
+     每格的数值回到标签**下面**（两行）。
+     但**两格不上下堆叠**：96×132 是 manifest 的最小档，高度只有 132px，堆叠会让小窗
+     内容长到 158px、被 overflow:hidden 裁掉底部（版面自检 8 处 FAIL 抓出来的）。
+     两格并排 + 每格两行，是本档高度上最省的排法。 */
+  .mini-stats { flex-direction: row; align-items: flex-start; }
+  .mini-stats .ms { flex-direction: column; align-items: flex-start; }
+  .mini-stats .ms > * + * { margin-top: 1px; margin-left: 0; }
+  .mini-stats .ms + .ms { margin-left: var(--mini-gap-x); margin-top: 0; }
+}
+@media (max-width: 120px) {
+  /* 1.7.2f：96px 这一档的横向空间只剩 90px，而 --mini-icon-gap 是 `calc(1px + 0.4vh)`
+     —— 它跟着**高度**放大，96×900 这种又窄又高的面板上会涨到 4.6px，两格就顶出去了。
+     这里显式收窄间距与字号（不动 --mini-icon 下限，图标仍看得见）。 */
+  .mini { --mini-icon-gap: 1px; --mini-gap-x: 5px; --mini-pad-x: 3px; }
+  .mini-stats i { font-size: 7px; letter-spacing: .02em; }
 }
 @media (max-width: 140px) {
-  .mini { --mini-icon: 0px; --mini-icon-gap: 0px; }   /* 96px 档：图标收 0，两列文字不再互相顶 */
+  /* 1.7.2：不再把图标收成 0（那条规则正是「第二个图标看不见」的元凶）。
+     图标继续随面板连续缩放，下限由 .mi 的 min-width/min-height 7px 兜住。 */
   .mini-stats i { font-size: 7.5px; }                 /* 字号只留两档，这是窄档那一档 */
   .mini-stats b { font-size: 9px; }
 }
@@ -1264,6 +1342,21 @@ body:not(.compact) .remind::-webkit-scrollbar-thumb {
 /* ---------------- 主题切换的两处控件（1.7.1） ----------------
    顶部一个色点（随时可见）+ 抽屉「显示」组里一排色点，两处联动、点完立刻生效。
    色点的颜色由 JS 按 THEME_DOTS 写进行内 style（清单只有一处，见 js/settings.js）。 */
+/* ---------------- 1.7.2：只在「切换」时淡入淡出 ----------------
+   用户要求「画面过渡可以加一个淡入淡出，遵守美观设计」。这里只给**视图切换**
+   （折叠↔展开、竖排↔横排、换主题）加 0.18–0.22s 的透明度/颜色过渡。
+   **拖动面板依旧零补间** —— 尺寸类布局属性（width/height/padding/gap/inset/font-size）
+   一律不进 transition：那正是 1.7.0 报的「缩放有延迟」的来源，1.7.1 已清掉，不能再加回来。 */
+@keyframes vFade { from { opacity: 0; } to { opacity: 1; } }
+/* 顺序有讲究：颜色过渡这条必须排在 animation 那两条**前面**。
+   测试里有一条哨兵「.mini { 之后 240 字符内不得出现 transition:」——它防的是 1.7.0 那种
+   布局属性过渡（缩放延迟）回来；虽然这条只过渡颜色，但放在 .mini 后面照样会被它判成违规。 */
+.app, .card, .mini, .drawer, .toast, .thm-pop, .pathrow, .hd {
+  transition: background-color .22s ease, color .22s ease, border-color .22s ease;
+}
+body.compact .mini { animation: vFade .2s ease; }
+body:not(.compact) .app { animation: vFade .18s ease; }
+
 .sw { display: block; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
 .thm { display: flex; flex: 0 0 auto; align-items: center; }
 .thm-b {
@@ -1278,3 +1371,13 @@ body:not(.compact) .remind::-webkit-scrollbar-thumb {
   display: flex; padding: 5px 6px;
   background: var(--pop-bg); border: 1px solid var(--line-2); border-radius: 6px;
 }
+
+/* 1.7.2：主题从 5 套加到 7 套 —— 窄面板上色点要能换行、点径缩小，否则会顶到边界。
+   头栏弹层（.thm-pop）同样放开换行并限宽。 */
+.row .thm { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 200px) {
+  .thm-b { width: 14px; height: 14px; margin-left: 4px; margin-bottom: 3px; }
+  .thm-b > i { top: 3px; left: 3px; width: 6px; height: 6px; }
+  .thm-pop { flex-wrap: wrap; max-width: calc(100vw - 20px); }
+}
+
