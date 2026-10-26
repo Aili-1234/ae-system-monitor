@@ -876,6 +876,7 @@ body.compact .mini {
   width: var(--mini-ring); height: var(--mini-ring);
   min-width: 44px; min-height: 44px;     /* 1.7.1：夹上下限 —— 等价 clamp()，但 CEP 8 也认 */
   max-width: 64px; max-height: 64px;
+  background: transparent;               /* 1.7.3：button 的 UA 默认背景（#f0f0f0）会露白 —— 这就是「太亮」 */
   border-radius: 50%;
   border: 0; padding: 0;
   display: flex; align-items: center; justify-content: center;
@@ -886,7 +887,7 @@ body.compact .mini {
    外圈只留一条更暗的轨道（--bg-hi，比原来的 --line 还暗一档），
    进度改画在**内圈**（r=12.6，周长 2πr ≈ 79.17，dasharray/offset 由 main.js 的 setArc 写）。
    告警语义不变：--rc 仍是琥珀/红，换图案不改「红 = 危险」。 */
-.mini-ring .arc-bg { stroke: var(--bg-hi); }
+.mini-ring .arc-bg { stroke: var(--line); }   /* 1.7.3：#232323 在深底上几乎看不见，双层环的外圈要看得见 */
 .mini-ring .arc-fg { display: none; }
 .mini-ring .arc-in {
   fill: none; stroke: var(--rc, var(--fg-2)); stroke-width: 1.2;

@@ -312,6 +312,13 @@ ok('主显示「缓存已用」图标是**实心**层叠块（1.7.2：细线在 
    /cache: '<rect x="1\.2" y="1\.9" width="7\.6" height="1\.7" rx="\.85" fill="currentColor"\/>/.test(mainJs) &&
    !/cache: '<ellipse/.test(mainJs) && !/M1\.2 2\.6h7\.6/.test(mainJs));
 
+ok('小窗圆环的底衬是透明的（1.7.3：button 去掉 conic-gradient 后 UA 默认背景 #f0f0f0 露白，正是「太亮」的根源）',
+   /\.mini-ring \{[\s\S]{0,420}?background: transparent;/.test(css) &&
+   /\.mini-ring \{[\s\S]{0,420}?border: 0; padding: 0;/.test(css));
+ok('双层环的外圈轨道用 --line（1.7.3：--bg-hi 在深底上几乎看不见）',
+   /\.mini-ring \.arc-bg \{ stroke: var\(--line\); \}/.test(css) &&
+   /\.mini-ring \.arc-in \{[\s\S]{0,220}?stroke: var\(--rc, var\(--fg-2\)\)/.test(css));
+
 
 console.log('\n[8h] 面板主题（1.7.1 五套深色 → 1.7.2 八套：两套浅色 + 一套黑；顶部色点 + 抽屉一行两处联动）');
 
@@ -397,8 +404,8 @@ ok('进度条中性色对底色至少可见（≥ 2，它不是文字）', wWors
   '最差 ' + wWorst(['--accent']).name + ' ' + wWorst(['--accent']).ratio.toFixed(2));
 
 console.log('\n[8i] 1.7.2：双层环 + 图标实心跟随主题 + 数值同行 + 按钮居中 + 切换淡入淡出 + 八套主题');
-ok('小窗圆环改成双层：外圈只留更暗的轨道，进度画在内圈（r=12.6，周长 ≈79.17）',
-   /\.mini-ring \.arc-bg \{ stroke: var\(--bg-hi\); \}/.test(css) &&
+ok('小窗圆环改成双层：外圈轨道（1.7.3 起用 --line，深底上看得见），进度画在内圈（r=12.6，周长 ≈79.17）',
+   /\.mini-ring \.arc-bg \{ stroke: var\(--line\); \}/.test(css) &&
    /\.mini-ring \.arc-fg \{ display: none; \}/.test(css) &&
    /\.mini-ring \.arc-in \{[\s\S]{0,200}?stroke-dasharray: 79\.17[\s\S]{0,80}?stroke-dashoffset: 79\.17/.test(css) &&
    /class="arc-in"/.test(html) &&
@@ -666,7 +673,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 286;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 288;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -712,18 +719,18 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「18 组、1016 项断言」',
-     /18 组、\*\*1016 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1016/1016（不是旧数）',
-     /必须 1016\/1016/.test(report));
+  ok('PLUGIN-REPORT 声明「18 组、1018 项断言」',
+     /18 组、\*\*1018 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1018/1018（不是旧数）',
+     /必须 1018\/1018/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
   ok('CHANGELOG 的 1.7.1 条目写 1003 项',
      /## 1\.7\.1[\s\S]*?1003 项/.test(changelog));
-  ok('CHANGELOG 的 1.7.2 条目写 1016 项',
-     /## 1\.7\.2[\s\S]*?1016 项/.test(changelog));
-  ok('README 写 1016 项', /1016 项/.test(readme));
+  ok('CHANGELOG 的 1.7.2 / 1.7.3 条目写对了计数',
+     /## 1\.7\.2[\s\S]*?1016 项/.test(changelog) && /## 1\.7\.3[\s\S]*?1018 项/.test(changelog));
+  ok('README 写 1018 项', /1018 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）
