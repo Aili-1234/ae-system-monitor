@@ -63,15 +63,6 @@ body[data-theme="lotus"] {   /* 藕紫 */
   --mini-ico: #a598c0;
 }
 
-body[data-theme="gray"] {    /* 灰色 */
-  --bg: #202020; --bg-hi: #292929; --bg-lo: #1b1b1b; --bg-lo2: #242424;
-  --fg: #ededed; --fg-2: #a2a2a2; --fg-3: #ababab;
-  --line: #353535; --line-2: #454545;
-  --ok: #a8a8a8; --warn: #c9a35e; --bad: #c97070; --accent: #7e7e7e;
-  --pop-bg: #2b2b2b; --pop-fg: #f5f5f5; --pop-hi: #383838;
-  --sbar: #2e2e2e; --sbar-hi: #3d3d3d; --sbar-2: #2b2b2b;
-  --mini-ico: #a8a8a8;
-}
 
 body[data-theme="pink"] {    /* 淡粉 */
   --bg: #1e171b; --bg-hi: #281e23; --bg-lo: #1a1418; --bg-lo2: #241b20;
@@ -90,14 +81,14 @@ body[data-theme="pink"] {    /* 淡粉 */
    （六个语义色对各自 --bg 最差 ≥ 4.5:1）。弹层/抽屉/滚动条全部走既有变量，不需要另写逻辑。
    第三套 black 是**纯黑 + AE 原生那种灰蓝高亮**：底色比默认薄荷绿更深（#131313 vs #1a1a1a），
    强调色取 AE 深色界面里那种偏灰的蓝（#5c8fb8，不是天青蓝那种亮青），整体更靠近 AE 自己的深色 UI。 */
-body[data-theme="ivory"] {   /* 象牙白（暖白纸感） */
-  --bg: #f6f3ee; --bg-hi: #ffffff; --bg-lo: #efeae3; --bg-lo2: #f3efe8;
-  --fg: #2b2b2b; --fg-2: #5f5f5f; --fg-3: #6b6b6b;
-  --line: #e2ddd4; --line-2: #cfc9c0;
-  --ok: #2f7a52; --warn: #8a5f16; --bad: #a33a34; --accent: #8a8a8a;
-  --pop-bg: #ffffff; --pop-fg: #1f1f1f; --pop-hi: #f0ece5;
-  --sbar: #d8d3ca; --sbar-hi: #c9c3b9; --sbar-2: #ded8cf;
-  --mini-ico: #6b6b6b;
+body[data-theme="pinkwhite"] {   /* 白粉（1.7.4 由「象牙白」改名：底色更白、文字转粉） */
+  --bg: #fffafc; --bg-hi: #ffffff; --bg-lo: #fdf3f7; --bg-lo2: #fef7fa;
+  --fg: #a83a63; --fg-2: #a8506f; --fg-3: #a8506f;
+  --line: #f2dde5; --line-2: #e6c9d5;
+  --ok: #b3355e; --warn: #8a5f16; --bad: #a33a34; --accent: #b8567c;
+  --pop-bg: #ffffff; --pop-fg: #8f2f4f; --pop-hi: #fbe9f0;
+  --sbar: #f0dbe3; --sbar-hi: #e6c9d5; --sbar-2: #f4e2ea;
+  --mini-ico: #b03a63;
 }
 
 body[data-theme="mist"] {    /* 雾蓝浅（冷灰蓝，接近 AE 浅色 UI） */
@@ -935,10 +926,11 @@ body.compact .mini {
 /* 没选指标的那一格（以及两格都没选时的整行）不占位置。
    注意 .mini-stats 自己有 display:flex，会压过 UA 的 [hidden]{display:none}，必须显式写。 */
 .mini-stats[hidden], .mini-stats .ms[hidden] { display: none; }
-/* 1.7.2：数值挪到标签**同一行**（用户：「右边纤细数据可以移到文字后面」）——
-   每格从两行变一行，短面板上省下一整行高度。 */
-.mini-stats .ms { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; }
-.mini-stats .ms > * + * { margin-top: 0; margin-left: 4px; }
+/* 1.7.4：数值一律放到标签**下面**（用户：「次要项目数据是在每行项目文字的下面更美观」，
+   并给了 281×399 与 269×564 两张真机截图）。竖排后每格只要容纳「标签」与「数值」里较宽的
+   那个，比 1.7.2 的同行排法窄一截 —— 用户说的「位置够、数据不用省略」就是这么来的。 */
+.mini-stats .ms { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.mini-stats .ms > * + * { margin-top: 1px; margin-left: 0; }
 .mini-stats .ms-h { display: flex; align-items: center; min-width: 0; }
 /* 图标与文字之间原本靠 flex gap（Chromium 84+），改成 i 的 margin-left：
    图标宽度在窄档会被断点收到 0，margin 也跟着变量一起收，不需要额外断点。 */
@@ -1309,17 +1301,10 @@ body:not(.compact) .remind::-webkit-scrollbar-thumb {
   /* 横排↔竖排是一次「切换」，给这一档加上淡入（离开这一档动画自然消失，不会在拖动中反复播） */
   body.compact .mini-main, body.compact .mini-side, body.compact .mini-row { animation: vFade .22s ease; }
 }
-@media (max-width: 180px) {
-  /* 1.7.2b（用户给了窄档的样子）：窄面板上一行塞不下「图标 + 四个字 + 数值」→
-     每格的数值回到标签**下面**（两行）。
-     但**两格不上下堆叠**：96×132 是 manifest 的最小档，高度只有 132px，堆叠会让小窗
-     内容长到 158px、被 overflow:hidden 裁掉底部（版面自检 8 处 FAIL 抓出来的）。
-     两格并排 + 每格两行，是本档高度上最省的排法。 */
-  .mini-stats { flex-direction: row; align-items: flex-start; }
-  .mini-stats .ms { flex-direction: column; align-items: flex-start; }
-  .mini-stats .ms > * + * { margin-top: 1px; margin-left: 0; }
-  .mini-stats .ms + .ms { margin-left: var(--mini-gap-x); margin-top: 0; }
-}
+/* 1.7.4：这里原本有一条「≤180px 才把每格数值挪到标签下面」的窄档断点。
+   用户看过真机截图后要求**所有宽度**都按那种排版，于是那几条规则升为基准
+   （见上面 .mini-stats .ms），断点本身删掉 —— 少一个断点，也少一处
+   「窄档与宽档长得不一样」的意外。两格并排的安排不变：96×132 上下堆叠会高出视口。 */
 @media (max-width: 120px) {
   /* 1.7.2f：96px 这一档的横向空间只剩 90px，而 --mini-icon-gap 是 `calc(1px + 0.4vh)`
      —— 它跟着**高度**放大，96×900 这种又窄又高的面板上会涨到 4.6px，两格就顶出去了。

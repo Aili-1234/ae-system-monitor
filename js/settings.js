@@ -90,14 +90,14 @@
    * 所以浅色主题另给一套 fg/fg-2/fg-3 与语义色，由 [8h] 的对比度实算断言卡住。
    * 这两套浅色的色点直接用**它自己的底色**，与深色六套（色点 = 强调色/中性灰）刻意不同 ——
    * 一眼就能认出「这套是浅色」。 */
-  var THEMES = ['mint', 'azure', 'lotus', 'gray', 'pink', 'ivory', 'mist', 'black'];
+  var THEMES = ['mint', 'azure', 'lotus', 'pink', 'pinkwhite', 'mist', 'black'];
   var THEME_LABELS = {
-    mint: '薄荷绿', azure: '天青蓝', lotus: '藕紫', gray: '灰色', pink: '淡粉',
-    ivory: '象牙白', mist: '雾蓝浅', black: '黑色'
+    mint: '薄荷绿', azure: '天青蓝', lotus: '藕紫', pink: '淡粉',
+    pinkwhite: '白粉', mist: '雾蓝浅', black: '黑色'
   };
   var THEME_DOTS = {
-    mint: '#7fbf9a', azure: '#63b3d4', lotus: '#a99ad0', gray: '#a8a8a8', pink: '#dda3b8',
-    ivory: '#f6f3ee', mist: '#eef2f6', black: '#6b6b6b'
+    mint: '#7fbf9a', azure: '#63b3d4', lotus: '#a99ad0', pink: '#dda3b8',
+    pinkwhite: '#fffafc', mist: '#eef2f6', black: '#6b6b6b'
   };
 
   var MINI_MAIN = ['cache_pct', 'mem_free_pct', 'need_pct', 'disk_free_pct'];
@@ -131,7 +131,9 @@
       mem:   { type: 'bool' },
       disk:  { type: 'bool' },
       guard: { type: 'bool' },
-      theme: { type: 'enum', values: THEMES, def: 'mint' }
+      // alias：1.7.4 把「象牙白 ivory」改名成「白粉 pinkwhite」，老值先翻译再校验，
+      // 否则升级后小窗会静默跳回薄荷绿（用户自己选的主题不该被一次改名吃掉）
+      theme: { type: 'enum', values: THEMES, def: 'mint', alias: { ivory: 'pinkwhite' } }
     },
     crashGuard: {
       on:          { type: 'bool' },

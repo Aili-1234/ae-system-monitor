@@ -353,7 +353,7 @@ function wThemeVars(text) {
   return out;
 }
 const wVars = wThemeVars(wCss);
-const wThemes = ['mint', 'azure', 'lotus', 'gray', 'pink', 'ivory', 'mist', 'black'];
+const wThemes = ['mint', 'azure', 'lotus', 'pink', 'pinkwhite', 'mist', 'black'];
 
 function wPicked() {
   return wThemes.map(t => Object.assign({}, wVars.mint, wVars[t] || {}));
@@ -390,8 +390,9 @@ ok('主题写到 body 的 data-theme 上（CSS 只认这个属性）', /setAttri
 ok('两处控件用同一套事件委托（动态生成的色点不能逐个挂 listener）',
   /function themePick\(/.test(mainJs) && /\$\('themePop'\)\.addEventListener\('click', themePick\)/.test(mainJs) &&
   /\$\('themeRow'\)\.addEventListener\('click', themePick\)/.test(mainJs));
-ok('CSS 里有七套主题块（薄荷绿是 :root 默认那套，不重复写一块）',
-  ['azure', 'lotus', 'gray', 'pink', 'ivory', 'mist', 'black'].every(t => wCss.indexOf('body[data-theme="' + t + '"]') >= 0));
+ok('CSS 里有六套主题块（薄荷绿是 :root 默认那套；1.7.4 删了灰色、象牙白改名白粉）',
+  ['azure', 'lotus', 'pink', 'pinkwhite', 'mist', 'black'].every(t => wCss.indexOf('body[data-theme="' + t + '"]') >= 0) &&
+  wCss.indexOf('body[data-theme="gray"]') < 0);
 ok('CSS 里颜色只出现在变量定义里（别处一律 var()，否则换主题会露出旧底色）',
   wHexOutsideVars().length === 0, wHexOutsideVars().join(' | '));
 ok('每套主题都覆盖了小窗图标色（1.7.2 起图标颜色只跟主题走，不再有固定描边色）',
@@ -419,11 +420,13 @@ ok('小窗图标全部改实心（细线在 6~9px 下糊成一团），颜色走
 ok('图标尺寸下限抬到 7px，且极窄档不再把图标收成 0（那条规则正是「看不见」的元凶）',
    /min-width: 7px; min-height: 7px/.test(css) &&
    !/--mini-icon: 0px/.test(css) && !/--mini-icon-gap: 0px/.test(css));
-ok('两格数值挪到标签同一行（每格从两行变一行）',
-   /\.mini-stats \.ms \{ flex: 0 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; \}/.test(css) &&
-   /\.mini-stats \.ms > \* \+ \* \{ margin-top: 0; margin-left: 4px; \}/.test(css));
-ok('窄面板（≤180px）每格数值回到标签下面，且两格**并排**不堆叠（96×132 堆叠会被裁底部）',
-   /@media \(max-width: 180px\) \{[\s\S]{0,420}?\.mini-stats \{ flex-direction: row; align-items: flex-start; \}[\s\S]{0,400}?\.mini-stats \.ms \{ flex-direction: column; align-items: flex-start; \}[\s\S]{0,200}?\.mini-stats \.ms \+ \.ms \{ margin-left: var\(--mini-gap-x\); margin-top: 0; \}/.test(css));
+ok('两格数值在标签**下面**（1.7.4 按用户真机截图统一：图一/图二/图三都这样排）',
+   /\.mini-stats \.ms \{ flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; \}/.test(css) &&
+   /\.mini-stats \.ms > \* \+ \* \{ margin-top: 1px; margin-left: 0; \}/.test(css));
+ok('1.7.4 删掉「≤180px 才竖排」那个断点（竖排已是基准），横排档仍是左对齐竖排',
+   !/@media \(max-width: 180px\)/.test(css) &&
+   /\.mini-side \.ms \{ align-items: flex-start; flex-direction: column; \}/.test(css) &&
+   /\.mini-side \.ms > \* \+ \* \{ margin-top: 1px; margin-left: 0; \}/.test(css));
 ok('底部按钮行留在右栏、跟着两格居中（1.7.2b 按用户要求回到「之前那样」）',
    /\.mini-row \{ display: flex; \}/.test(css) &&
    /\.mini-side \.mini-row \{ margin-top: var\(--mini-gap\); \}/.test(css) &&
@@ -434,10 +437,23 @@ ok('切换时淡入淡出（折叠/展开、换主题、横竖排），拖动仍
    /body\.compact \.mini \{ animation: vFade \.2s ease; \}/.test(css) &&
    /transition: background-color \.22s ease, color \.22s ease, border-color \.22s ease;/.test(css) &&
    !/\.mini \{[\s\S]{0,240}?transition:/.test(cssCode));
-ok('主题从 5 套加到 8 套（新增象牙白 ivory、雾蓝浅 mist、黑色 black）',
-   /var THEMES = \['mint', 'azure', 'lotus', 'gray', 'pink', 'ivory', 'mist', 'black'\];/.test(settings) &&
-   ['ivory', 'mist', 'black'].every(t => wCss.indexOf('body[data-theme="' + t + '"]') >= 0) &&
-   /THEME_LABELS = \{[\s\S]{0,200}?black: '黑色'/.test(settings));
+ok('主题 5 套 → 8 套 → 1.7.4 调成 7 套（删灰色、象牙白改名白粉，旧值 ivory 自动迁移）',
+   /var THEMES = \['mint', 'azure', 'lotus', 'pink', 'pinkwhite', 'mist', 'black'\];/.test(settings) &&
+   ['pinkwhite', 'mist', 'black'].every(t => wCss.indexOf('body[data-theme="' + t + '"]') >= 0) &&
+   /alias: \{ ivory: 'pinkwhite' \}/.test(settings) &&
+   /THEME_LABELS = \{[\s\S]{0,220}?pinkwhite: '白粉'/.test(settings));
+
+console.log('\n[8j] 1.7.4：数值竖排 + 白粉主题（都是真机截图驱动的改动）');
+ok('白粉主题在 CSS 里：底色比象牙白更白（#fffafc）、文字是粉的（#a83a63）',
+   /body\[data-theme="pinkwhite"\]/.test(wCss) && /--bg: #fffafc;/.test(wCss) && /--fg: #a83a63;/.test(wCss));
+ok('白粉主题的图标色也走粉（--mini-ico: #b03a63）', /--mini-ico: #b03a63;/.test(wCss));
+ok('灰色主题块与 gray 白名单值都已删除，不留悬空引用',
+   wCss.indexOf('body[data-theme="gray"]') < 0 && !/THEMES = \[[^\]]*'gray'/.test(settings) && !/gray: '#/.test(settings));
+ok('四个主题函数与两个控件都还在（换主题清单不该顺手改坏接线）',
+   /function applyTheme\(/.test(mainJs) && /function setTheme\(/.test(mainJs) &&
+   /function themePick\(/.test(mainJs) && /\$\('themeRow'\)/.test(mainJs) && /\$\('themePop'\)/.test(mainJs));
+ok('小窗两格的 DOM 结构没变（只改 CSS 方向：图标+标签一行、数值下一行）',
+   /class="ms-h"/.test(htmlCode) && /<b id="mv1">/.test(htmlCode) && /<b id="mv2">/.test(htmlCode));
 
 console.log('\n[9] manifest 允许折叠成窄条 / 版本覆盖');
 ok('MinSize 宽度 <= 120', /<Width>(\d+)<\/Width>/.test(manifest) &&
@@ -673,7 +689,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 288;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 293;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -719,18 +735,19 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「18 组、1018 项断言」',
-     /18 组、\*\*1018 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1018/1018（不是旧数）',
-     /必须 1018\/1018/.test(report));
+  ok('PLUGIN-REPORT 声明「18 组、1024 项断言」',
+     /18 组、\*\*1024 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1024/1024（不是旧数）',
+     /必须 1024\/1024/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
   ok('CHANGELOG 的 1.7.1 条目写 1003 项',
      /## 1\.7\.1[\s\S]*?1003 项/.test(changelog));
-  ok('CHANGELOG 的 1.7.2 / 1.7.3 条目写对了计数',
-     /## 1\.7\.2[\s\S]*?1016 项/.test(changelog) && /## 1\.7\.3[\s\S]*?1018 项/.test(changelog));
-  ok('README 写 1018 项', /1018 项/.test(readme));
+  ok('CHANGELOG 的 1.7.2 / 1.7.3 / 1.7.4 条目写对了计数',
+     /## 1\.7\.2[\s\S]*?1016 项/.test(changelog) && /## 1\.7\.3[\s\S]*?1018 项/.test(changelog) &&
+     /## 1\.7\.4[\s\S]*?1024 项/.test(changelog));
+  ok('README 写 1024 项', /1024 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

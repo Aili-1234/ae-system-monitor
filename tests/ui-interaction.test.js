@@ -437,9 +437,9 @@ console.log('\n[新 14] 面板主题：把 main.js 里那段主题代码抠出�
   const bodyStub = { attrs: {}, style: {}, setAttribute(k, v) { this.attrs[k] = v; } };
   const docStub = { body: bodyStub };
   const settsStub = {
-    THEMES: ['mint', 'azure', 'lotus', 'gray', 'pink'],
-    THEME_LABELS: { mint: '薄荷绿', azure: '天青蓝', lotus: '藕紫', gray: '灰色', pink: '淡粉' },
-    THEME_DOTS: { mint: '#7fbf9a', azure: '#63b3d4', lotus: '#a99ad0', gray: '#a8a8a8', pink: '#dda3b8' },
+    THEMES: ['mint', 'azure', 'lotus', 'pink', 'pinkwhite', 'mist', 'black'],
+    THEME_LABELS: { mint: '薄荷绿', azure: '天青蓝', lotus: '藕紫', pink: '淡粉', pinkwhite: '白粉' },
+    THEME_DOTS: { mint: '#7fbf9a', azure: '#63b3d4', lotus: '#a99ad0', pink: '#dda3b8', pinkwhite: '#fffafc' },
     normalize(cfg) { return cfg; }
   };
   function api(usr) {

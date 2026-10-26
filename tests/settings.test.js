@@ -147,8 +147,9 @@ console.log('\n[新] 小窗指标可自由选（1.6.5）');
   })());
 }
 console.log('\n[新] 面板主题（1.7.1）：白名单与默认值');
-ok('THEMES 导出八套主题（1.7.2 加了浅色两套与黑色），第一套是薄荷绿',
-  Array.isArray(S.THEMES) && S.THEMES.length === 8 && S.THEMES[0] === 'mint' && S.THEMES[7] === 'black');
+ok('THEMES 导出七套主题（1.7.4 去掉灰色、象牙白改名白粉），第一套是薄荷绿',
+  Array.isArray(S.THEMES) && S.THEMES.length === 7 && S.THEMES[0] === 'mint' && S.THEMES[6] === 'black' &&
+  S.THEMES.indexOf('gray') < 0);
 ok('主题默认是薄荷绿（= 1.7.0 及以前的样子）', S.defaults().ui.theme === 'mint');
 ok('白名单外的主题退回默认（脏数据不写坏值）', S.normalize({ ui: { theme: 'rainbow' } }).ui.theme === 'mint');
 ok('每套主题都有中文名与合法色点', S.THEMES.every(t => !!S.THEME_LABELS[t] && /^#[0-9a-f]{6}$/.test(S.THEME_DOTS[t])));
@@ -157,9 +158,12 @@ ok('主题只是 ui 里的一个字段，别的 ui 开关不受影响（一次�
   return c.ui.theme === 'pink' && c.ui.cache === true && c.ui.guard === true;
 })());
 
-ok('1.7.2 新增的三套都在白名单里（象牙白 / 雾蓝浅 / 黑色）',
-  ['ivory', 'mist', 'black'].every(t => S.THEMES.indexOf(t) >= 0));
+ok('白粉（原象牙白）/ 雾蓝浅 / 黑色都在白名单里，旧的 ivory 自动迁移到 pinkwhite',
+  ['pinkwhite', 'mist', 'black'].every(t => S.THEMES.indexOf(t) >= 0) &&
+  S.normalize({ ui: { theme: 'ivory' } }).ui.theme === 'pinkwhite');
 ok('黑色那套叫「黑色」（给 AE 原生深色 UI 的那一档）', S.THEME_LABELS.black === '黑色');
+ok('白粉那套叫「白粉」（1.7.4：底色比象牙白更白、文字转粉，色点用它自己的底色）',
+  S.THEME_LABELS.pinkwhite === '白粉' && S.THEME_DOTS.pinkwhite === '#fffafc');
 ok('八套主题各有中文名与合法色点（色点用来画头栏那个小圆）',
   S.THEMES.every(t => !!S.THEME_LABELS[t] && /^#[0-9a-f]{6}$/.test(S.THEME_DOTS[t])));
 
