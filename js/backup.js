@@ -123,6 +123,45 @@
     }
   }
 
+  /* 最近 n 份：列表本身已按名字（=时间）倒序，这里只把边界收口。
+   * 为什么放在这里而不是 main.js：面板只摊开最近几份是一条纯规则，
+   * 抽成函数才能在 Node 里把边界（空/不足/n 非法）直接测掉。 */
+  function recent(list, n) {
+    var k = Math.max(1, Math.round(Number(n) || 1));
+    return (list || []).slice(0, k);
+  }
+
+  /* 从一份副本自己的 path 认出它 —— 面板逐份取回按这个走。
+   *
+   * 为什么需要它（1.6.2 的 P0）：列表行是**渲染那一刻**的快照，点击发生在之后。
+   * 这中间文件系统会变：新的保护保存落进一份、轮转删掉最老的、用户在 AE 里另存了工程。
+   * 早先按钮上带的是**下标**，点击时再拿它去查一遍重新读出来的列表 ——
+   * 列表一旦变了位（多一份/少一份/换了工程），同一个下标就指向另一份：
+   * 用户点的是 14:32 那份，拿回来的可能是别的，甚至 undefined。
+   * 路径是这份副本自己的身份，与列表顺序无关，所以认身份不认位置。
+   *
+   * 找不到返回 null（那份已经被轮转删了）—— 调用方据此明确告知，而不是静默取错一份。 */
+  function pickByPath(list, p) {
+    if (!p) return null;
+    var arr = list || [];
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i] && arr[i].path === p) return arr[i];
+    }
+    return null;
+  }
+
+
+  /* 落点决策：用户填了自定义目录就用它 —— 但它可能已经不可用（盘拔了、网盘断了、权限没了）。
+     这种时候必须**退回默认位置并如实告知**（返回 fellback=true 让面板显示出来）：
+     回退副本是「已经出事时唯一还能拿回来的那一份」，静默跳过等于把它悄悄关掉。
+     canUse 由调用方注入（main.js 用 fs 判），本文件保持纯逻辑、可单测。 */
+  function pickRoot(custom, defaultRoot, canUse) {
+    var c = typeof custom === 'string' ? custom.trim() : '';
+    if (c && (!canUse || canUse(c))) return { root: c, custom: true, fellback: false };
+    if (c) return { root: defaultRoot || '', custom: false, fellback: true };
+    return { root: defaultRoot || '', custom: false, fellback: false };
+  }
+
   /* 从列表里挑最新的一份（按文件名时间戳） */
   function latest(names) {
     var sorted = (names || []).slice().sort().reverse();
@@ -139,6 +178,9 @@
     atomicCopy: atomicCopy,
     restoreName: restoreName,
     rotate: rotate,
-    latest: latest
+    latest: latest,
+    recent: recent,
+    pickRoot: pickRoot,
+    pickByPath: pickByPath
   };
 });

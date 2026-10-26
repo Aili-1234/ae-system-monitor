@@ -109,6 +109,66 @@ console.log('\n[7] 挑最新');
   ok('单份原样返回', B.latest(['only.aep']) === 'only.aep');
 }
 
+/* ============================================================
+ * [8] 逐份取回：按下标取会取错人（1.6.2 的 P0）
+ *
+ * 面板那一行展开后是**渲染那一刻**的快照。用户看到 3 行，点了第 2 行 ——
+ * 但点击发生在之后，这中间文件系统随时可能变：
+ *   · 保护保存又落进一份（列表头部多一个，全体下标 +1）
+ *   · 轮转删掉最老的（尾部少一个）
+ *   · 用户在 AE 里另存，ST.projectPath 换了，整份列表换人
+ *
+ * 早先按钮带的是下标，点击时再拿它去查一遍**重读**的列表：
+ * 同一个下标，在变过位的列表里指向的是**另一份副本**。
+ * 用户点的是 14:32，拿回来的可能是 11:05 —— 而界面不会给他任何提示。
+ * 这类 bug 在「什么都不变」时永远测不出来，所以这里直接把变化注入进去。
+ * ============================================================ */
+console.log('\n[8] 逐份取回：认路径，不认下标');
+{
+  const P = (n, t) => ({ name: n, path: 'D:\\x\\bk\\' + n, size: 1000, mtime: t, old: false });
+  // 用户展开时看到的（最新的在最前）
+  const shown = [P('c__1430.aep', 300), P('b__1105.aep', 200), P('a__0900.aep', 100)];
+
+  ok('展开时能看到 3 份', B.recent(shown, 3).length === 3);
+
+  // 用户点了第 2 行（b__1105）。此刻重读列表：新的一份 c__1500 落在最前，全体下移。
+  const after = [P('d__1500.aep', 400)].concat(shown);
+
+  // 旧写法：拿点击时的下标 1 去查**重读**的列表
+  const byIndex = after[1];
+  ok('按下标取会取到错的那一份（这就是 P0）',
+     byIndex.path !== shown[1].path && byIndex.path === 'D:\\x\\bk\\c__1430.aep',
+     '点的是 b__1105.aep，拿回的是 ' + byIndex.name);
+
+  // 新写法：按路径认身份
+  const byPath = B.pickByPath(after, shown[1].path);
+  ok('按路径取：漂移后仍取回用户点的那一份',
+     byPath && byPath.path === shown[1].path, byPath && byPath.name);
+
+  // 反向漂移：轮转把最老的删了，列表变短
+  const shrunk = shown.slice(0, 2);
+  ok('列表变短也认得出', B.pickByPath(shrunk, shown[1].path).path === shown[1].path);
+  ok('被删掉的那份返回 null（明确告知，不静默取错一份）',
+     B.pickByPath(shrunk, shown[2].path) === null);
+
+  // 工程切换：整份列表换人
+  const other = [P('z__1600.aep', 500)];
+  ok('换了工程的列表里找不到旧的 path',
+     B.pickByPath(other, shown[1].path) === null);
+
+  // 边界
+  ok('空 path 返回 null（不给「恰巧第一份」）', B.pickByPath(shown, '') === null);
+  ok('null path 返回 null', B.pickByPath(shown, null) === null);
+  ok('空列表安全', B.pickByPath([], shown[0].path) === null);
+  ok('列表里的空洞不炸', B.pickByPath([null, undefined, shown[0]], shown[0].path) === shown[0]);
+  ok('同一 path 出现两次时返回第一个', B.pickByPath([shown[0], shown[0]], shown[0].path) === shown[0]);
+
+  // 新旧目录同名副本不会互相冒充：path 不同就是不同的人
+  const dup = { name: shown[0].name, path: 'E:\\old\\' + shown[0].name, size: 9, mtime: 1, old: true };
+  ok('旧目录里的同名副本不冒充新目录那份（path 不同）',
+     B.pickByPath([dup, shown[0]], shown[0].path).path === shown[0].path);
+}
+
 /* 假 fs：只实现 atomicCopy 用到的那几个方法，用来注入「写一半 / 字节数不符 / rename 失败」。
  * 这几个失败在真机上等于「断电 / 磁盘满 / 权限被拒」，手动测不出来，只能注入。 */
 function fakeFs(opt) {
@@ -168,5 +228,42 @@ console.log('\n[8] 原子落盘：（1.6.1）先写 .part 再 rename，失败不
 
 function pathmod2() { return path; }
 
+console.log('\n[9] 最近 n 份（面板只摊开最近 3 份）');
+{
+  const all = ['c__2026.aep', 'b__2026.aep', 'a__2026.aep'];
+  ok('不足 3 份时原样返回', B.recent(all, 3).join(',') === all.join(','));
+  ok('超过 3 份只留前 3 份', B.recent(['e', 'd', 'c', 'b', 'a'], 3).join(',') === 'e,d,c');
+  ok('空列表与 null 都安全', B.recent([], 3).length === 0 && B.recent(null, 3).length === 0);
+  ok('n 非法时至少给 1 份', B.recent(['b', 'a'], 0).length === 1 && B.recent(['b', 'a'], 'x').length === 1);
+  ok('不修改原数组', (function () { const src = ['b', 'a']; B.recent(src, 1); return src.length === 2; })());
+}
+
+
+/* ---------- [新] pickRoot（1.6.4）：自定义落点不可用时必须退回默认并报 fellback ---------- */
+console.log('\n[新] pickRoot 落点决策');
+{
+  const yes = () => true, no = () => false;
+
+  let r = B.pickRoot('', 'D:\\默认', yes);
+  ok('没填自定义 -> 默认落点、不算回退', r.root === 'D:\\默认' && !r.custom && !r.fellback, JSON.stringify(r));
+
+  r = B.pickRoot('  E:\\备份  ', 'D:\\默认', yes);
+  ok('填了且可用 -> 用它，并去掉空白', r.root === 'E:\\备份' && r.custom && !r.fellback, JSON.stringify(r));
+
+  r = B.pickRoot('E:\\备份', 'D:\\默认', no);
+  ok('填了但不可用 -> 退回默认并标记 fellback（面板要如实显示）',
+     r.root === 'D:\\默认' && !r.custom && r.fellback, JSON.stringify(r));
+
+  r = B.pickRoot('E:\\备份', '', no);
+  ok('不可用且没有默认根 -> root 为空（调用方据此不出目录，而不是写到奇怪的相对路径）',
+     r.root === '' && r.fellback, JSON.stringify(r));
+
+  r = B.pickRoot(123, 'D:\\默认', no);
+  ok('非字符串当成没填（不把数字拼进路径）', r.root === 'D:\\默认' && !r.fellback, JSON.stringify(r));
+
+  r = B.pickRoot('E:\\备份', 'D:\\默认', null);
+  ok('没注入可用性判定时按可用处理（纯函数不应自己猜盘在不在）',
+     r.root === 'E:\\备份' && r.custom, JSON.stringify(r));
+}
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

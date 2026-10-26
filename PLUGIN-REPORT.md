@@ -4,15 +4,15 @@
 |---|---|
 | 名称 | System Monitor for After Effects（AE 系统监视器） |
 | 类型 | Adobe CEP 扩展（停靠面板，内置在 AE 内） |
-| 版本 | 1.6.1 |
+| 版本 | 1.7.0 |
 | Bundle ID | `com.sysmon.ae.panel` |
-| 宿主 | After Effects CC 2018 (15.0) ~ 2026+（manifest：`AEFT [15.0,99.9]` + `CSXS 7.0`） |
+| 宿主 | After Effects 2018 (15.0) ~ 2026+（manifest：`AEFT [15.0,99.9]` + `CSXS 8.0`） |
 | 运行环境 | Windows（磁盘优先 `fs.statfsSync`，降级 PowerShell CIM；macOS 走 `statfs`/`df`） |
 | 安装位置 | `%APPDATA%\Adobe\CEP\extensions\AESystemMonitor` |
 | 实测环境 | Windows / AE 24.2 / Node 22（面板侧） |
-| 测试规模 | 18 组、**789 项**断言；本机与"无 AE 环境"跑出**完全相同的数字**（`node tests/*.test.js`） |
+| 测试规模 | 18 组、**976 项**断言；本机与"无 AE 环境"跑出**完全相同的数字**（`node tests/*.test.js`） |
 | 交付状态 | 已安装，安装副本与源码 11 个文件逐字节一致 |
-| 报告日期 | 2026-10-25（v13，1.6.1：提示框回到面板内且按钮可点、首屏视图可选、两种模式的提醒优化；已推送 GitHub） |
+| 报告日期 | 2026-10-26（v19，1.7.0：老 AE 兼容（下界回到 AE 2018）、修缩放延迟、小窗矮则横排；1.6.6：修小窗单位错（142 GB 显示成 142B），并把次显示改成浅显说法（「缓存上限」+ 词语指标「盘够装吗」）；1.6.5：极简小窗的主显示与两格次显示都能自己选、重复的自动留空；1.6.4：小窗占用行整组居中 + 图标、回退副本落点可改、补发 1.6.3 审计的 P0 修复；1.6.2：回退副本逐份取回、小窗占用行；1.6.1：提示框回到面板内且按钮可点、首屏视图可选、两种模式的提醒优化；已推送 GitHub） |
 
 ---
 
@@ -240,7 +240,7 @@ for f in tests/*.test.js; do node "$f" | tail -2; done
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-模块职责的分界线很硬：**纯逻辑模块不碰 DOM、不碰文件系统**，所以 `ae-cache.js`、`settings.js`、`reminder.js`、`guard.js`、`trend.js` 都能在 Node 里直接跑断言；`main.js` 只做展示与调度。这条分界线是 789 项断言能存在的前提——五个纯逻辑模块（`settings` / `reminder` / `guard` / `trend` / `ae-cache`）就占了 208 项（176 + 扫描 12 + 兼容 21），全部注入假时间、假 fs 与假数据，不需要真的开着 AE。
+模块职责的分界线很硬：**纯逻辑模块不碰 DOM、不碰文件系统**，所以 `ae-cache.js`、`settings.js`、`reminder.js`、`guard.js`、`trend.js` 都能在 Node 里直接跑断言；`main.js` 只做展示与调度。这条分界线是 976 项断言能存在的前提——五个纯逻辑模块（`settings` / `reminder` / `guard` / `trend` / `ae-cache`）就占了 208 项（176 + 扫描 12 + 兼容 21），全部注入假时间、假 fs 与假数据，不需要真的开着 AE。
 
 ---
 
@@ -415,7 +415,7 @@ for f in tests/*.test.js; do node "$f" | tail -2; done
 行格式固定，可直接用记事本看：
 
 ```
-2026-10-25 15:02:11 | OK | 风险升高 | 1840ms | 成功 | D:\工作\片头.aep
+2026-10-25 15:02:11 | OK | 风险升高 | 1855ms | 成功 | D:\工作\片头.aep
 ```
 
 | 行为 | 细节 |
@@ -460,16 +460,16 @@ for f in tests/*.test.js; do node "$f" | tail -2; done
 
 | AE 版本 | CEP | CEP 内置 Node | 状态 | 依据 |
 |---|---|---|---|---|
-| CC 2015.3 (13.8) | 6.1 | 6 | 理论可用 | 需 CEP 6.1+ 才有 `--enable-nodejs` |
-| ~~CC 2017 (14.0)~~ | 7 | 6 / 8 | **1.5.0 起不再支持**（manifest 下限已提到 15.0，CC 2017 面板不加载） | 降级路径代码仍在，但 CEP 根本不会加载插件 |
-| CC 2018 (15.0) | 8 | 8 | 声明支持 | 无 `fs.promises`、无 `withFileTypes`，已模拟测试 |
-| CC 2019 (16.0) | 9 | 8 / 9 | 声明支持 | 同上 |
-| 2020 (17.x) | 10 | 10 | 声明支持 | `dirty` 从 17.5 起可用 |
-| 2021 ~ 2023 (18 ~ 23) | 11 | 10 ~ 18 | 声明支持 | — |
+| ~~CC 2015.3 (13.8)~~ | 6.1 | 6 | **1.5.0 起不加载** | manifest 下限当时已提到 15.0 |
+| ~~CC 2017 (14.0)~~ | 7 | 6 / 8 | **1.5.0 起不加载** | manifest 下限当时已提到 15.0 |
+| **CC 2018 (15.0)** | 8 | 8 | **1.7.0 起恢复支持**（下限回到 15.0） | Chromium 57：flex gap / clamp / inset 已全部换成 margin + 离散断点，够用 |
+| **CC 2019 (16.0)** | 9 | 8 / 9 | **1.7.0 起恢复支持** | Chromium 61，兼容改写后可用 |
+| **2020 (17.x)** | 10 | 10 | **1.7.0 起恢复支持** | Chromium 74，兼容改写后可用 |
+| 2021 ~ 2023 (18 ~ 23) | 11 | 10 ~ 18 | 声明支持 | Chromium 88，flex gap / clamp / inset 全部可用 |
 | **2024 (24.2)** | 11 | 18 | **已实测** | 全部功能实机跑通 |
 | 2025+ (25.x) | 12 | ≥ 18 | 声明支持 | Host 上限 99.9 |
 
-manifest 声明：`AEFT [15.0, 99.9]` + `CSXS 7.0`。安装脚本写 `CSXS.6 ~ CSXS.12` 的 `PlayerDebugMode`。
+manifest 声明：`AEFT [15.0, 99.9]` + `CSXS 8.0`（**最低 AE 2018**）。1.6.6 曾把下界抬到 AE 2021，理由是界面依赖 `flex gap`（Chromium 84+）、`clamp()/min()/max()`（79+）、`inset`（87+）；1.7.0 把这些全部换成语义等价的旧写法 —— flex gap → 相邻兄弟的 margin（由脚本按方向生成）、grid gap → `grid-gap`、`clamp()` → 定值 + `@media` 离散断点、`inset` → 四边、环形图 `conic-gradient` → 内联 SVG 圆环 —— 下界因此收回到 Chromium 57 档。测试里有「rep 里不许出现 clamp/inset/place-items/conic-gradient 与 `max()`/`min()` 函数」的静态断言守着这条线。CEP 7（约 Chromium 45）仍不支持：连 CSS 变量与 Grid 都没有，等于重写主题，判定不做。
 
 ### 6.2 为兼容做的四处改造
 
@@ -481,6 +481,8 @@ manifest 声明：`AEFT [15.0, 99.9]` + `CSXS 7.0`。安装脚本写 `CSXS.6 ~ C
 | ExtendScript 是 ES3，老版本无全局 `JSON` | `JSON.stringify` 抛错，状态读取整体失效 | **不用 JSON**，改 `k=v&k=v` 纯文本协议，字符串自行 `encodeURIComponent` |
 
 最后一处顺带解决了编码问题：所有非 ASCII 都被百分号编码，传输全程纯 ASCII，中文路径不再需要特殊处理。
+
+注意：下界抬到 AE 2021 后，上面这些老 Node 分支在实际能加载的宿主里都走不到（CEP 11 内置 Node 10+）。保留它们不是为了当前版本，而是避免"为了删几行代码去动已经验证过的读取链路"；`tests/compat.test.js` 仍照常跑这些模拟环境。
 
 ### 6.3 兼容性测试怎么做的
 
@@ -499,13 +501,13 @@ manifest 声明：`AEFT [15.0, 99.9]` + `CSXS 7.0`。安装脚本写 `CSXS.6 ~ C
 
 ### 7.1 总表
 
-18 组、**789 项**断言，全部通过；换一台没装 AE 的机器跑，数字不变。
+18 组、**976 项**断言，全部通过；换一台没装 AE 的机器跑，数字不变。
 
 | 测试 | 项数 | 覆盖什么 |
 |---|---:|---|
 | `umd.test.js` | 11 | 模块在 CEP / 浏览器 / Node 三种环境下都能被取到，且 CEP 分支真能读到偏好 |
 | `scan.test.js` | 12 | 扫描结果与独立递归实现逐字节比对（fixture 缓存树，不硬编码、不依赖本机） |
-| `settings.test.js` | 45 | 脏数据归一化、数值裁剪、自定义分钟不被吸附、**首屏视图 uiDefault 的枚举校验** |
+| `settings.test.js` | 76 | 脏数据归一化、数值裁剪、自定义分钟不被吸附、**首屏视图 uiDefault 的枚举校验** |
 | `reminder.test.js` | 65 | 间隔边界、关闭再开启、稍后提醒、阈值连续判定、冷却、**渲染静音不补响**、**极简模式短消息** |
 | `guard.test.js` | 50 | 风险分级、两种触发、冷却、渲染跳过、写盘风暴防护 |
 | `guard-crash.test.js` | 41 | **提交内存信号、崩溃史→不稳定期**、有效阈值的下限保护 |
@@ -517,11 +519,11 @@ manifest 声明：`AEFT [15.0, 99.9]` + `CSXS 7.0`。安装脚本写 `CSXS.6 ~ C
 | `prefs-version.test.js` | 32 | **偏好按运行版本对齐**：精确/降级/全局三级回退、缓存目录 strict 定位 |
 | `crash-history.test.js` | 40 | 从 WER 读崩溃史：UTF-16LE 解码、异常代码翻译、次数与中位间隔、脾气分档 |
 | `guard-modes.test.js` | 46 | **四个档位**：自动推荐规则、预设数值、按档位的崩溃窗口、安静档不进不稳定期 |
-| `wiring.test.js` | 146 | ID 接线、脚本顺序、label 指向、manifest 声明、声音是否彻底移除、**提示框落位与 pointer-events**、**首屏视图接线**、**两种模式的提醒样式**、**带文字按钮禁用方形图标尺寸**、**HTML 不残留 Markdown 星号**、**抽屉行不许硬挤** |
+| `wiring.test.js` | 259 | ID 接线、脚本顺序、label 指向、manifest 声明、声音是否彻底移除、**提示框落位与 pointer-events**、**首屏视图接线**、**两种模式的提醒样式**、**带文字按钮禁用方形图标尺寸**、**HTML 不残留 Markdown 星号**、**抽屉行不许硬挤**、**回退列表收起时机与占用行解耦**、**小窗占用行居中与图标**、**回退副本落点可改** |
 | `optimize.test.js` | 57 | 上限与日志开关进 schema、其他版本缓存枚举、降频/降级路径未被退回 |
-| `backup.test.js` | 43 | **回退副本**：命名/哈希分夹/轮转保留份数/挑最新、**毫秒时间戳**、**撞名兜底**、**原子落盘（含假 fs 注入的三类写失败）**、覆盖优先语义 |
-| `ui-interaction.test.js` | 41 | **用纯 Node 造的最小 DOM 真的点按钮**：提示框落在面板内、动作按钮可点并触发回调、点空白即消失、同屏上限 3 条、首屏视图三态、极简模式按钮仍在框内 |
-| **合计** | **789** | |
+| `backup.test.js` | 66 | **回退副本**：命名/哈希分夹/轮转保留份数/挑最新、**毫秒时间戳**、**撞名兜底**、**原子落盘（含假 fs 注入的三类写失败）**、覆盖优先语义 |
+| `ui-interaction.test.js` | 61 | **用纯 Node 造的最小 DOM 真的点按钮**：提示框落在面板内、动作按钮可点并触发回调、点空白即消失、同屏上限 3 条、首屏视图三态、极简模式按钮仍在框内、**刷新闸门不被异常钉死（P0：把 refreshFail / guardRefresh / refresh 从 main.js 抠出来真跑）** |
+| **合计** | **976** | |
 
 ### 7.2 四类特别值得说的测试
 
@@ -579,14 +581,15 @@ ExtendScript 里属性名打错（`dirty` 写成 `isDirty`）不会报语法错�
 for f in tests/*.test.js; do printf '%-28s' "$f"; node "$f" | tail -1; done
 ```
 
-期望逐项通过数（18 组、合计 **789**，失败数一律为 0）：
+期望逐项通过数（18 组、合计 **976**，失败数一律为 0）：
 
 ```
-umd 11       scan 12          settings 45      reminder 65
-guard 50     guard-crash 41   guard-modes 46   trend 40
-trend-margin 41   autosave 19  hostjsx 39       compat 21
-prefs-version 32  crash-history 40   backup 30   wiring 132
-optimize 57   ui-interaction 41
+umd 11            scan 12           settings 76       reminder 65
+guard 50          guard-crash 41    guard-modes 46    trend 40
+trend-margin 41   autosave 19       hostjsx 39        compat 21
+prefs-version 32  crash-history 40  backup 66         wiring 238
+optimize 57       ui-interaction 61
+                                              —— 合计 976
 ```
 
 **这条曾经不成立，1.4.4 才成立。** 早先 `scan` / `compat` / `autosave` / `umd` / `optimize` 五组直接读本机真实 AE 偏好，于是「本机全绿、CI 红」同时成立。1.4.4 复用 `tests/_fixture.js`（临时目录里造 `设置.txt`、`*-indep-general.txt`、自动保存目录与缓存树，把 `os.homedir()` / `os.hostname()` 指过去，Windows 与 mac 两种偏好位置都写）把这五组改成 fixture 驱动。修复前后的实测对比见 [7.5](#75-测试与装没装-ae的关系144-已修)。
@@ -653,7 +656,7 @@ for f in tests/*.test.js; do node -r ./tests/_no-ae-sim.js "$f"; done   # 全部
 | 视觉样式 | `css/style.css`（极简风：只用 1px 细线分组，彩色只给状态） |
 | 风险权重 / 阈值 | `js/guard.js` 顶部 `W` 常量（`js/guard.js:32-41`） |
 | 提醒默认值 | `js/settings.js` 的 `DEFAULTS`（`js/settings.js:21-40`） |
-| 新增可调字段 | `js/settings.js` 的 `SCHEMA`（`js/settings.js:43-67`），加了自动生效 |
+| 新增可调字段 | `js/settings.js` 的 `SCHEMA`（`js/settings.js:95-134`），加了自动生效 |
 | 增速窗口与精度 | `js/trend.js`（`js/trend.js:32-36`） |
 | 判定三条线 | `js/main.js:412-420` |
 | 刷新节奏 | `js/main.js:39-40` 的 `CFG` |
@@ -719,6 +722,11 @@ node tests/wiring.test.js
 
 | **1.5.0** | **保存链路与提示补齐**：①保护保存成功时，若回退副本制作失败，toast 明确追加「本次未留回退副本：<原因>」，但**保存照常执行（覆盖仍优先）**；有副本时 toast 直接带「取回上一版」按钮，5 秒内可点（`toast(msg, action)` 新增动作参数，toast 容器改为 flex 以容纳按钮）；②保存失败时追加「请尝试手动 Ctrl/Cmd+S 保存」；③回退副本文件名改用**源副本的 mtime** 而非点击时刻（`Backup.restoreName(path, list[0].mtime)`），多份副本不再混淆；④**备份落盘改到工程所在盘** `<工程目录>/.ae-system-monitor-backups/<工程名+路径哈希>/`，工程目录不可用时退回 `%LOCALAPPDATA%`；⑤复制后核对源/副本字节数，不一致则删除该副本并报「副本大小校验未通过」；⑥次级文字 `--fg-3` 由 `#5d5d5d` 提亮到 `#999999`（对比度约 2.5:1 → 4.8:1，达 WCAG AA），toast 允许换行；⑦manifest 升至 1.5.0，Host 声明由 `[14.0,99.9]` 收窄为 `[15.0,99.9]`（**放弃 AE CC 2017，理由是 CEP 版本与 Node 6~8 的兼容风险**）；⑧`wiring.test.js` 两条 Host 断言同步。测试仍 17 组 660 项 |
 | **1.6.1** | **交互可用性与首屏视图**：①🔴**修 toast 动作按钮点不动的真 bug**（`.toast.show` 补 `pointer-events: auto`）；②提示框从 `position:fixed` 挂 body 改为落在面板内的 `#bottomStack`（宽度=面板宽），不再溢出到面板外；③提示框与提醒条共用底部堆叠容器，不再互相盖住；④**小窗（极简）模式**：提示框与提醒条改竖排、动作按钮占满宽度，窄面板里也点得到；⑤`reminder.js` 新增 `shortMsg`，小窗用短消息，点标题可切换长短；⑥新增设置项「首屏视图」：极简 / 完整 / 沿用上次，改完立即生效；⑦提醒设置区加状态摘要 + 常用间隔一键填入；⑧新增 `tests/ui-interaction.test.js`（纯 Node 最小 DOM，真的点一下按钮）。测试 18 组 789 项 |
+| **1.6.2** | **回退副本可逐份取回 + 小窗占用行**：①「回退副本 N 份 · 最近 …」改成可点开，按时间列出**最近 3 份**（今天只给 `时:分`，更早给 `月-日 时:分`），每行右侧 ↺ 取回该份 —— 取回仍是生成新文件（`<工程名>（回退 时刻）.aep`，撞名自动 -2），不动原工程；面板窄到 150px 以下只留时间列，取回键永不被挤出；②极简（小窗）模式圆环下加占用行：**缓存占用在左、内存占用在右**，沿用同一套阈值取色（85% 黄 / 97% 红）；③新增 `Backup.recent()` / `stampShort()` / `restorePick()` / `renderBackupList()` / `renderMiniStats()`；④版面自检从 280px 扩到 **96px**（manifest 最小尺寸），正常 + 极简两模式 10 组无重叠无溢出。测试 18 组 855 项 |
+| **1.6.4** | **小窗占用行居中 + 图标**：①两列从「各占一半、右列右对齐」改成**整组居中**，间距 `clamp(6px, 8vw, 16px)` 随面板宽度收缩（200px → 16px，96px → 6px）；②缓存 / 内存各加一个内联 SVG（叠层圆柱 / 带引脚芯片），与数值同一套取色（85% 黄、97% 红）；③`wiring.test.js` 新增 4 条断言（图标、居中、自适应间距、图标随色）。**回退副本落点可改**：设置里新增「副本目录」，留空＝老行为（工程目录旁），填了就在该目录下再套一层同名容器；**目录不可用时退回默认位置并出声**，改落点后默认位置里的老副本仍列出、每份标注来源并可逐份取回；`settings.js` 新增 `normStr` + `backupDir`，`js/backup.js` 新增纯函数 `pickRoot`（6 条单测）。**补发 1.6.3 审计的 P0 修复**：刷新链前置段抛异常会让 `ST.busy` 永久为真（面板停更、点 ⟳ 也进不去，只能重载），改为 `guardRefresh` / `refreshFail`，并补 7 条行为测试真跑这两个函数。测试 18 组 899 项 |
+| **1.7.0** | **最终版：老 AE 兼容 + 修缩放延迟 + 小窗矮则横排**：把 `flex gap`（33 处）、`clamp()/min()/max()`（11 处）、`inset`（3 处）、`place-items`、`conic-gradient` 全部换掉（flex gap → `> * + *` 的 margin，grid gap → `grid-gap`，`clamp()` → 定值 + 离散 `@media` 断点，环形图 → 内联 SVG `r=15.9155`（周长正好 100）+ `stroke-dashoffset:100-p`），宿主下界从 `AEFT [18.0,99.9]`/`CSXS 11.0` 回到 `[15.0,99.9]`/`CSXS 8.0`（最低 AE 2018）；删掉小窗 9 处布局属性过渡、resize 改 rAF 节流（缩放不再慢半拍）；极简小窗在矮面板下横排（左环右数值）、拉高回竖排。测试 18 组 976 项 |
+| **1.6.6** | **修「还能写 142B」的单位错 + 次显示改浅显**：`leftGB` / `needGB` / `driveFreeGB` 是 GB 数值，却被按字节缩放的 `miBytes` 格式化 —— 缓存盘还有 142 GB 会显示成「142B」（用户当场看出来），现在这几个字段走新的 `miGB`（内部 ×GB 后再交给 `miBytes`），字节字段仍留在 `miBytes`；同时把次显示里最容易误读的「AE 所需 159GB / 87%」换掉 —— 159GB 是「缓存上限 + 安全缓冲」而非已用量，`need_gb` 改显示真正的上限并叫「缓存上限」，比率 `need_pct` 换成词语指标 **「盘够装吗」**（够 / 偏紧 / 不够，判定复用面板既有三条线 `ST.cache.verdict`），其余名字改成直白说法（缓存已用 / 内存可用 / 配额还剩 / 磁盘可用 / 缓存增速 / 多久写满）；宿主下界同时抬到 AE 2021（`AEFT [18.0,99.9]` + `CSXS 11.0`，见第十二节决策 17）。测试 18 组 955 项 |
+| **1.6.5** | **极简小窗显示什么自己挑**：主显示（圆环 + 大标签）四选一 —— 磁盘缓存已用 % / 内存剩余 % / AE 所需缓存占比 % / 盘余量 %；下面两格各九选一（含「不显示」）：缓存 GB / 内存剩余 GB / AE 所需 GB / AE 所需 % / 还能写 GB / 盘余量 GB / 缓存增速 / 距耗尽。**某一格与主显示（或前一格）是同一个数的不同单位时自动留空**，并在设置里写明原因；选项清单只在 `js/settings.js` 定义一次（`MINI_MAIN` / `MINI_SUB` / `MINI_LABELS` / `MINI_UNITS`），设置页与小窗共用；`fixMini` 幂等且 `normalize` 里也会跑一遍，所以 `parse` / `stringify` 同样不留重复；老值 `cache` / `mem` 自动迁移。主显示换指标时标签与图标一起换（`MI_MAIN_INFO` 四套阈值），每格图标按 85% / 97% 变色。测试 18 组 939 项 |
 报告本身也带版本：
 
 | 报告版本 | 变更 |
@@ -811,8 +819,8 @@ node tests/wiring.test.js
 
 | # | 问题 | 影响 | 建议 | 优先 |
 |---|---|---|---|---|
-| L1 | **备份失败是静默的** | `makeBackup` 失败时仍继续保存（这是对的），但成功 toast 只说「已自动保存工程」，失败信息只落在卡片一行 `bkHint` 里。用户以为"有回退"，其实没有 | toast 里明说「本次未留副本」并把卡片标黄 | P0（信任） |
-| L2 | **回退副本名用的是「取回时间」** | `restoreName(ST.projectPath, Date.now())` 取的是按下按钮那一刻，不是备份那一刻。目录里几份回退副本分不清谁对应哪次备份 | 改成用被取回那份的 `mtime` | P1 |
+| ~~L1~~ | ~~**备份失败是静默的**~~ ✅ **已实施（1.6.1）** | 原症状：`makeBackup` 失败时仍继续保存（这是对的），但成功 toast 只说「已自动保存工程」，失败信息只落在卡片一行 `bkHint` 里，用户以为"有回退"其实没有 | 已改为 toast 明说「本次未留副本」+ 卡片标黄（`js/main.js:1105`、`js/main.js:1123`） | ~~P0~~ 完成 |
+| ~~L2~~ | ~~**回退副本名用的是「取回时间」**~~ ✅ **已实施（1.6.2）** | 原症状：`restoreName(ST.projectPath, Date.now())` 取的是按下按钮那一刻，不是备份那一刻，目录里几份副本分不清谁对应哪次备份 | 已改为传被取回那份的 `mtime`（`js/main.js:1288`） | ~~P1~~ 完成 |
 | L3 | 不检测「文件被外部改过」 | 工程在网盘/同步目录，或另一台机器开着同一个工程时，覆盖会吞掉对方改动 | 保存前比对 `mtime` 与上次记录，发现外部变动就降级为「只提示」 | P2 |
 | L4 | 心跳超时可能误判 | 大范围撤销、缓存写入时主线程会卡 3 秒以上，被当成「AE 无响应」计入风险 | 连续次数 2 → 3，或要求进程 CPU 同时为高 | P2 |
 | L5 | 手动改的上限只在本面板生效 | 面板显示 60 GB，AE 首选项里仍写着 149 GB，两处不一致 | 要么写回偏好，要么在数字旁标「仅本面板」 | P2 |
@@ -833,7 +841,7 @@ node tests/wiring.test.js
 
 | # | 事项 | 说明 | 风险 |
 |---|---|---|---|
-| F0 | **备份落盘位置跟工程同盘** | 现在 `backupRoot()` 固定在 `%LOCALAPPDATA%`（C 盘）。工程在 D 盘时，保险被放在最挤的那块盘上 —— 这是作者自己引入的问题 | 低（改自己行为） |
+| ~~F0~~ | ~~**备份落盘位置跟工程同盘**~~ ✅ **已实施（1.6.1）** | 原症状：`backupRoot()` 固定在 `%LOCALAPPDATA%`（C 盘），工程在 D 盘时保险被放在最挤的那块盘上 | 已改为优先 `<工程盘>\AESystemMonitorackup`，无权限再退回（`js/main.js:1178`） | ~~低~~ 完成 |
 | F1 | **目录体检** | 一次覆盖三条手工建议：① 工程盘 = 缓存盘？② AE 登记的自动保存目录存在吗（本机**不存在**）？③ 同目录 `.aep` 堆积数（本机 **7 个**，5 个是旧版本） | **零风险**（纯读） |
 | F2 | 旧自动保存版本清理 | 识别 `<工程名>自动保存 N.aep`，列清单让用户确认 | 中。三条硬约束：只识别不自动删、**走回收站不用 `unlink`**、只匹配比当前工程旧且文件名符合模式的 |
 | F3 | 分离建议 | 提示把 AE 自动保存目录改到 `D:\ae\_autosave\`，给复制路径按钮 | 低。**不做「一键改 AE 首选项」** —— 那个值 AE 运行时持有，外部改写易被覆盖甚至写坏 |
@@ -864,6 +872,9 @@ node tests/wiring.test.js
 | 14 | 「崩溃史」读 WER 目录 | 读 AE 自己的 `logs` 目录 | 实测本机 AE 的 `logs` 目录 6 个版本全是 0 个文件；WER 有完整记录，还带异常代码 | 需要读 `%ProgramData%`（个别机器可能没权限，失败即视为无记录） |
 | 15 | **Host 声明收窄到 `[15.0,99.9]`** | 保持 1.4.4 的 `[14.0,99.9]` | 1.5.0 决定放弃 AE CC 2017（14.0）：其 CEP 内置 Node 6~8，虽然代码有 `fs.promises` / `withFileTypes` 降级分支，但**从未真机验证过**。宁可少声明一个版本，也不让用户在 CC 2017 上遇到装不上面板 | **CC 2017 用户会看不到面板**。若日后实机验证通过，可把下界改回 14.0（改 `manifest.xml` 一行 + `wiring.test.js` 两条断言） |
 | 16 | **提示框与提醒条收进面板内的底部堆叠容器** | 继续用 `position: fixed` 挂 body 上 | CEP 是停靠面板，fixed 以视口为基准，窄侧栏下会溢出到面板外，按钮点不到；且提示框与提醒条抢同一个底部位置会互相盖住。**代价**：小窗模式下底部区域被占，提示框与提醒条改为竖排（按钮占满宽度）来腾空间 | 小窗下可用高度少约 40px；两者不会同时出现在底部堆叠里时更明显 |
+| 17 | **Host 下界从 `[15.0,99.9]` 抬到 `[18.0,99.9]`，RequiredRuntime 同步到 CEP 11** | ①保持 15.0，给 `flex gap` / `clamp` / `inset` 写 `@supports` 降级；②只改 Host、RequiredRuntime 留 7.0 | 界面已深度依赖 Chromium 79~87 的特性（小窗缩放用 `clamp()`，全局间距用 flex `gap`，遮罩用 `inset`）。AE 2020 及更早是 Chromium 61~74：**面板能加载，但间距全丢、缩放失效**，这比"看不到面板"更难排查。写 `@supports` 降级要把 37 处 `gap`、9 组小窗变量逐条换成 margin/media query，视觉与现在不一致，且没有旧版 AE 可实测 | **AE 2018~2020 用户会看不到面板**（CEP 直接不加载）。若日后确要支持，先补 flex gap 与 clamp 的降级，再用真机验证，最后改 `manifest.xml` 两处 + `wiring.test.js` 三条断言 |
+| 18 | **把宿主下界从 `[18.0,99.9]` 收回 `[15.0,99.9]`，RequiredRuntime 回到 CEP 8** | ①保持 18.0，让老 AE 用户用不了；②只改 RequiredRuntime、Host 不动 | 上一版抬高下界的理由是「界面依赖 Chromium 79~87 的特性」，但那些特性是可替换的：flex gap 用相邻兄弟 margin 表达、`clamp()` 换成定值 + 144/160/200px 三档离散断点、`inset` 写四边、环形图从 `conic-gradient` 换成内联 SVG（顺带干掉 `::after` 与 `place-items`）。rep 里已无 `clamp/max/min/inset/place-items/conic-gradient`，JS 侧本来就有 `fs.promises` 降级 | CEP 7（约 Chromium 45）仍不支持：连 CSS 变量与 Grid 都没有，等于重写主题，**判定不做** |
+
 
 ---
 
@@ -875,15 +886,15 @@ node tests/wiring.test.js
 
 | 事项 | 现状 |
 |---|---|
-  | 版本 | 1.6.1（只在 `CSXS/manifest.xml` 的 `ExtensionBundleVersion`；面板界面不显示版本） |
-| 源码 | `<工作区>/AESystemMonitor-1.6.0/`（目录名对应 1.6.0 发布，源码内 manifest 已升到 1.6.1），11 个运行文件 + 18 个测试文件（测试 2841 行） |
-| 已部署 | 是。已复制到 `%APPDATA%\Adobe\CEP\extensions\AESystemMonitor`，10 文件、SHA256 与源码 0 差异 |
-| 测试 | 18 组 789 项全过；本机与无 AE 环境数字一致（命令见 [7.4](#74-一条命令复跑)） |
+  | 版本 | 1.7.0（只在 `CSXS/manifest.xml` 的 `ExtensionBundleVersion`；面板界面不显示版本） |
+| 源码 | `<工作区>/AESystemMonitor-1.6.0/`（目录名对应 1.6.0 发布，源码内 manifest 已升到 1.7.0），11 个运行文件 + 18 组测试（`tests/` 共 3703 行） |
+| 已部署 | 是。已复制到 `%APPDATA%\Adobe\CEP\extensions\AESystemMonitor`，13 个部署项、逐字节与源码 0 差异 |
+| 测试 | 18 组 976 项全过；本机与无 AE 环境数字一致（命令见 [7.4](#74-一条命令复跑)） |
 | 面板入口 | `index.html` → `js/main.js` 的 `init()` |
 | 数据入口 | `js/ae-cache.js` 的 `loadPrefs()` / `resolveCacheDir()` / `scanDir()` |
 | AE 侧入口 | `jsx/host.jsx` 的三个 `sysmon_*` 函数 |
 | 用户环境 | Windows；AE 24.2 与 23.0 并存；缓存盘 C（900 GB，约 197 GB 可用） |
-| 最大的技术债 | `js/main.js` 1992 行（见 13.5 P1） |
+| 最大的技术债 | `js/main.js` 3387 行（见 13.5 P1） |
 
 ### 13.2 已验证 vs 未验证（别把前者当后者）
 
@@ -903,7 +914,7 @@ cd <工作区>/AESystemMonitor
 # 1. 改完先自检语法
 node --check js/main.js
 
-# 2. 跑全量测试，必须 789/789
+# 2. 跑全量测试，必须 976/976
 for f in tests/*.test.js; do printf '%-28s' "$f"; node "$f" | tail -1; done
 
 # 3. 部署（Windows PowerShell）
@@ -939,16 +950,16 @@ Copy-Item index.html -Destination $d -Force
 | **P0 ✅ 已修（1.4.1）** | **ETA 的单位错配** | 原缺陷：`Trend.push` 只存缓存字节，`describe(hist, marginGB)` 拿缓存增速除余量；磁盘被别的程序吃掉时显示"缓存未增长"且不给 ETA | 已改为双字段 `{t,b,m}`：ETA 用余量斜率，缓存斜率只解释成因，三种归因分开写；老样本退回旧算法。`trend-margin.test.js` 41 项 |
 | **P1 ✅ 已补** | 面板截图 | 已用无头 Chrome 生成两张（折叠态 / 展开态），存在 `docs/`，见 [2.7](#27-首屏只留四个主项143) | 已解决 |
 | **P0 ✅ 已修（1.4.4）** | **把 5 组测试改成 fixture 驱动** | 实测：无 AE 的机器上 655 → 598 通过 + 1 失败 + 3 组退出，`scan` 还是 exit=1。这会让 CI 直接红，或者在别处"看起来绿但少测 56 条"（[7.5](#75-测试与装没装-ae的关系144-已修)） | 已移植：五组全部 fixture 驱动，本机与无 AE 环境都是 660/0（[7.5](#75-测试与装没装-ae的关系144-已修)） |
-| **P0（信任）** | **备份失败必须出声**（[11.4](#114-未实施的改进建议原样留给接手者) L1） | `makeBackup` 失败仍继续保存是对的，但成功 toast 只说「已自动保存工程」，失败信息只落在卡片一行。用户以为"有回退"，其实没有 | `doSave` 里判 `ST.guard.backupErr`，toast 加半句「本次未留副本」 |
+| ~~P0（信任）~~ ✅ | ~~**备份失败必须出声**~~ **已于 1.6.1 实施** | 见 `js/main.js:1105` / `1123`（`doSave` 判 `ST.guard.backupErr`，toast 加「本次未留副本」） | 无需再做 |
 | **P0（信任）** | **保存成功 toast 带「取回上一版」**（U1） | 备份做完了，但入口埋在展开区。5 秒内可点的"反悔"，才是让人敢依赖它的前提 | toast 组件加一个按钮调 `restoreLatest` |
-| P1 | 回退副本名用**备份时刻**而非取回时刻（L2） | 现在是 `restoreName(..., Date.now())`，目录里几份副本分不清谁对应哪次备份 | 传 `list[0].mtime`，改 1 行 + `backup.test.js` 补 2 条 |
-| P1 | **备份目录跟工程同盘**（F0） | `backupRoot()` 固定在 `%LOCALAPPDATA%`（C 盘）。工程在 D 盘时，保险放在最挤的盘上 —— 作者自己引入的问题 | 优先 `<工程盘>\AESystemMonitor\backup`，无权限再退回 |
+| ~~P1~~ ✅ | ~~回退副本名用**备份时刻**而非取回时刻~~ **已于 1.6.2 实施** | 见 `js/main.js:1288`（传 `pick.mtime`） | 无需再做 |
+| ~~P1~~ ✅ | ~~**备份目录跟工程同盘**（F0）~~ **已于 1.6.1 实施** | 见 `js/main.js:1178`（优先 `<工程盘>\AESystemMonitor\backup`，无权限再退回） | 无需再做 |
 | P1 | **目录体检**（F1） | 一次覆盖三条手工建议：工程盘=缓存盘？AE 登记的自动保存目录存在吗（本机**不存在**）？同目录 `.aep` 堆积数（本机 **7 个**） | **纯读，零风险**；结果放保护卡的展开区 |
 | P2 | 外部改动检测（L3） | 工程在网盘或另一台机器打开时，覆盖会吞掉对方改动 | 保存前比 `mtime`，变动则降级为只提示 |
 | P2 | 旧自动保存版本清理（F2） | 本机同目录 7 个 `.aep`，5 个是 `自动保存 31~35` 旧版本 | 需要确认流程 + **回收站调用，不许 `unlink`** |
 | P2 | 对比度（U5） | `--fg-3` 是 `#5d5d5d`，在 `#1a1a1a` 上约 2.5:1，而 9px 小字到处都是（WCAG AA 要 4.5:1） | 一行 CSS 提到 `#8a8a8a` |
 | P3 | 文案与小图形（U2/U3/U4/U6） | 失败提示不给下一步、档位是黑话、折叠窗看不到保护状态、「余量」太抽象 | 纯 UI，无逻辑风险 |
-| P1 | 拆分 `js/main.js`（2829 行，占运行代码 46%） | 最大的技术债，改动易误伤 | 纯重构，789 项测试可兜底 |
+| P1 | 拆分 `js/main.js`（3425 行，占运行代码 47%） | 最大的技术债，改动易误伤 | 纯重构，976 项测试可兜底 |
 | P2 | 免打扰时段（如 9:00–19:00） | 晚上加班不吵人 | 纯逻辑，`reminder.js` 加时间窗，好测 |
 | P2 | 缓存盘与工程盘同盘提示 | 同盘会互相抢空间，易触发"磁盘不足" | 比对 `path.parse().root` |
 | P2 | 上限建议（当前上限远大于实际用量） | 本机上限 149 GB、实占 5.94 GB（4%），相当于白占 143 GB 的"所需空间"，把余量压到 +38 GB；调到 60 GB 后余量立刻变 +127 GB，且不影响使用 | 纯逻辑：比较峰值用量与上限，给出建议值 |
@@ -973,7 +984,7 @@ Copy-Item index.html -Destination $d -Force
 ### 13.7 可直接粘贴给 AI 的提示词
 
 ```
-我要你接手一个 Adobe CEP 扩展：AE System Monitor（AE 系统监视器），当前版本 1.6.1。
+我要你接手一个 Adobe CEP 扩展：AE System Monitor（AE 系统监视器），当前版本 1.6.2。
 
 它做什么：读取 AE 首选项里的磁盘缓存配额，计算「所需空间 = 上限 + 安全缓冲(10GB)」，
 再与缓存盘可用空间比较得出「余量」判定；同时监控内存、媒体缓存、缓存增长速度，
@@ -996,7 +1007,7 @@ Copy-Item index.html -Destination $d -Force
 7) 不要用同步子进程取磁盘/系统信息（1.4.0 刚把 PowerShell 移出热路径）
 8) 新增可调参数一律进 js/settings.js 的 SCHEMA，不要裸存 localStorage
 
-工作流：改代码 → node --check → 跑 tests/ 全部（必须 789/789，0 失败）
+工作流：改代码 → node --check → 跑 tests/ 全部（必须 976/976，0 失败）
 → 复制到 %APPDATA%\Adobe\CEP\extensions\AESystemMonitor → 关掉面板标签重开。
 
 我要你做的事：<在这里写你的目标>
@@ -1012,7 +1023,7 @@ Copy-Item index.html -Destination $d -Force
 | 判定三条线 | `js/main.js:412-420` |
 | 风险权重与阈值 | `js/guard.js:32-45` 的 `W` 与 `MEM_*` |
 | 增速窗口 | `js/trend.js:32-36` |
-| 提醒默认值与范围 | `js/settings.js:21-74` |
+| 提醒默认值与范围 | `js/settings.js:55-61`（默认值）、`js/settings.js:122-134`（可填范围） |
 | 界面元素 | `index.html`（60+ 个 `id`） |
 | 界面绑定 | `js/main.js` 的 `init()` 里搜 `$('` |
 | AE 侧动作 | `jsx/host.jsx` → `sysmon_*` |
@@ -1081,7 +1092,7 @@ Copy-Item index.html -Destination $d -Force
 
 ## 附录、参数快照（源码为准）
 
-改动前先对一遍这张表；表里的行号对应 **1.6.1** 的源码，**改完代码记得同步这里**。
+改动前先对一遍这张表；表里的行号对应 **1.6.2** 的源码，**改完代码记得同步这里**。
 带定值的行是"契约"，改它等于改行为；只有行号的行是"路标"，重构后需要同步。
 
 | 参数 | 值 | 位置 |
@@ -1092,14 +1103,14 @@ Copy-Item index.html -Destination $d -Force
 | 磁盘读数缓存 | 30 秒 | `js/main.js:45` |
 | 其他版本缓存重扫 | 10 分钟 | `js/main.js:46` |
 | 内存曲线点数 | 60 | `js/main.js:47` |
-| 自动折叠阈值 | < 190 px | `js/main.js:768` |
+| 自动折叠阈值 | < 190 px | `js/main.js:789` |
 | 面板最小尺寸 | 96 × 132 | `CSXS/manifest.xml` |
 | 判定：充足 / 偏紧 / 不足 | 可用 ≥ 上限+缓冲 / ≥ 上限 / < 上限 | `js/main.js:625-627` |
 | 上限回退公式 | min(盘总量 × 10%, 100 GB) | `js/main.js:561` |
-| 手动上限可填范围 | 0（自动）或 1–4000 GB | `js/settings.js:63` |
-| 保存日志开关默认 | 开 | `js/settings.js:42`、`js/settings.js:77` |
+| 手动上限可填范围 | 0（自动）或 1–4000 GB | `js/settings.js:28`、`js/settings.js:101` |
+| 保存日志开关默认 | 开 | `js/settings.js:46`、`js/settings.js:115` |
 | 保存日志上限 / 面板显示 | 400 行 / 最近 5 次 | `js/main.js:57` |
-| 保存日志位置 | `%LOCALAPPDATA%\AESystemMonitor\saves.log` | `js/main.js:1123-1125` |
+| 保存日志位置 | `%LOCALAPPDATA%\AESystemMonitor\saves.log` | `js/main.js:1144-1146` |
 | 风险权重 `W` | 45 / 28 / 12 / 40 / 18 / 10 / 30 / 10 | `js/guard.js:43-53` |
 | 内存三档 | 92% / 85% / 75% | `js/guard.js:47-49` |
 | 余量偏紧线 / 缓存填满线 | 5 GB / 95% | `js/guard.js:61` |
@@ -1108,9 +1119,11 @@ Copy-Item index.html -Destination $d -Force
 | 崩溃保护可调范围 | 积压 1–120、风险 40–100、冷却 1–60 | `js/guard.js:128-135` |
 | 增速窗口 / 最短跨度 / 采样间隔 | 2 h / 10 min / 1 min | `js/trend.js:32-35` |
 | 增速点数上限 / 平稳阈值 | 480 点 / 0.01 GB/h | `js/trend.js:34-36` |
-| 提醒默认 | 喝水 45、起身 60、远眺 40、内存播报 30（关）、内存偏高 90%/3 次/15 min |  `js/settings.js:51-55`|
-| 提醒可填范围 | 5–240 min；阈值 50–99%；次数 1–30；冷却 1–180 |  `js/settings.js:84-87`|
-| 宿主 / CEP 下限 | `AEFT [15.0, 99.9]` / `CSXS 7.0` | `CSXS/manifest.xml` |
+| 提醒默认 | 喝水 45、起身 60、远眺 40、内存播报 30（关）、内存偏高 90%/3 次/15 min |  `js/settings.js:55-61`|
+| 提醒可填范围 | 5–240 min；阈值 50–99%；次数 1–30；冷却 1–180 |  `js/settings.js:123-134`|
+| 宿主 / CEP 下限 | `AEFT [15.0, 99.9]` / `CSXS 8.0`（最低 AE 2018） | `CSXS/manifest.xml` |
+| 小窗横排断点 | `@media (max-height:170px) and (min-width:150px)`（矮则横排，96/140px 宽仍竖排） | `css/style.css` |
+| 环形图 | 内联 SVG，`r=15.9155`（周长=100）+ `stroke-dasharray:100` / `dashoffset:100-p`，整体 `rotate(-90deg)` | `index.html` / `css/style.css` / `js/main.js` 的 `setArc` |
 | 提交内存三档 | 92% / 80% / 70%（权重 45/28/12） | `js/guard.js` 的 `W` 与 `COMMIT_*` |
 | 物理内存三档 | 92% / 85% / 75%（权重 20/12/6） | 同上（v2 降权） |
 | 崩溃史窗口 | 近 6 小时 22 分 / 近 24 小时 12 分 | `js/guard.js` 的 `CRASH_HOT_H` / `CRASH_DAY_H` |
@@ -1121,35 +1134,44 @@ Copy-Item index.html -Destination $d -Force
 | 回退副本默认 | 开，每个工程留 5 份（可关、可调 1–20） | `js/settings.js` 的 `backup` / `keepBackups` |
 | 备份目录 | `%LOCALAPPDATA%\AESystemMonitor\backup\<工程名>-<路径哈希>\` | `js/main.js` 的 `backupRoot` / `js/backup.js` 的 `folderFor` |
 | 备份文件名 | `<工程名>__YYYYMMDD-HHmmss.aep`（时间＝**备份时刻**） | `js/backup.js` 的 `backupName` |
-| 回退副本名 | `<工程名>（回退 YYYYMMDD-HHmmss）.aep`（时间＝**取回时刻**，见 11.4 L2） | `js/backup.js` 的 `restoreName` |
-| **首屏视图默认** | **compact（全部收起）**；可选 full / remember | `js/settings.js:27`、`js/settings.js:64` |
+| 回退副本名 | `<工程名>（回退 YYYYMMDD-HHmmss）.aep`（时间＝**被取回那份的备份时刻**；1.6.2 起不再用取回时刻，见 11.4 L2） | `js/backup.js` 的 `restoreName` |
+| **首屏视图默认** | **compact（全部收起）**；可选 full / remember | `js/settings.js:31`、`js/settings.js:102` |
 | **提示框停留时长** | **带动作 5 秒 / 纯提示 2.6 秒；同屏最多 3 条** | `js/main.js` 的 `toast` |
 | **极简模式提醒布局** | **竖排；动作按钮占满宽度；长消息限高 2.9em（点标题展开）** | `css/style.css` 的 `body.compact` 段 |
+| **回退副本列出份数** | **3 份**（在面板里逐份取回） | `js/main.js` 的 `BK_LIST_N` |
+| **窄面板隐藏尺寸列** | **< 150 px** | `js/main.js` 的 `renderBackupList` |
+| **小窗占用行** | **缓存左 / 内存右；整组居中（间距 6–16px 随宽度）；各带图标；85% 黄、97% 红** | `js/main.js` 的 `renderMiniStats`、`css/style.css` 的 `.mini-stats` |
+| **回退副本落点** | **默认：工程目录旁的「AE-System-Monitor 备份」；可改任意目录（其下再套一层同名容器）；不可用则退回默认位置并提示** | `js/main.js` 的 `backupRoot` / `defaultBackupDirFor`、`js/backup.js` 的 `pickRoot` |
+| **落点路径清理** | **去掉误带的引号与结尾分隔符、盘根补 `\`、清控制字符、截 240 字符；不判合法性** | `js/settings.js` 的 `normStr` |
+| **小窗主显示可选** | **四选一：`cache_pct` / `mem_free_pct` / `need_pct` / `disk_free_pct`（默认磁盘缓存已用 %）；换指标后标签与图标一起换** | `js/settings.js` 的 `MINI_MAIN`，`js/main.js` 的 `MI_MAIN_INFO` / `renderMini` / `renderSig` |
+| **数值单位（小窗）** | **GB 字段（配额还剩 / 上限+缓冲 / 磁盘可用）走 `miGB`，字节字段走 `miBytes`；`miBytes` 会去掉「142.0GB」的小数点尾巴** | `js/main.js` 的 `miGB` / `miBytes` / `MI_SUB_INFO`；`tests/wiring.test.js` [8e]、`tests/ui-interaction.test.js` [13] |
+| **小窗次显示的取名** | **不许把「上限」写成「所需」：`need_gb` 显示 `quotaGB`（标签「缓存上限」）；`enough`「盘够装吗」= 够 / 偏紧 / 不够，直接复用 `ST.cache.verdict` 的三条线，不另立阈值** | `js/settings.js` 的 `MINI_SUB` / `MINI_LABELS` / `MINI_UNITS`；`js/main.js` 的 `MI_SUB_INFO` / `renderMiniStats` |
+| **小窗次显示可选** | **两格各九选一（含「不显示」）；与主显示或前一格同指标（同单位）时自动留空** | `js/settings.js` 的 `MINI_SUB` / `miniFamily` / `fixMini`，`js/main.js` 的 `renderMiniStats` / `pruneMiniSelects` / `applyMiniChoice` |
 
 ---
 
 ## 附录 B 文件清单
 
-### B.1 运行文件（11 个，全部部署；1.6.1 文件数不变，改动集中在 `main.js` / `style.css` / `index.html` / `reminder.js` / `settings.js`）
+### B.1 运行文件（11 个，全部部署；1.6.2 文件数不变，改动集中在 `main.js` / `style.css` / `index.html` / `js/backup.js`）
 
 | 文件 | 行数 | 职责 | 可单测 |
 |---|---:|---|---|
-| `index.html` | 362 | 面板骨架，70+ 元素 ID | 接线测试间接覆盖 |
-| `css/style.css` | 874 | 极简视觉；只用 1px 细线与状态色；1.6.0 起提示框/提醒条收进面板内、小窗改竖排；**1.6.1 起带文字按钮用 `.wide` 自适应宽度、抽屉行允许换行** | 接线测试查选择器 |
+| `index.html` | 395 | 面板骨架，70+ 元素 ID | 接线测试间接覆盖 |
+| `css/style.css` | 1182 | 极简视觉；只用 1px 细线与状态色；1.6.0 起提示框/提醒条收进面板内、小窗改竖排；1.6.1 起带文字按钮用 `.wide` 自适应宽度、抽屉行允许换行；**1.6.2 起加回退副本列表与小窗占用行；1.6.4 起占用行整组居中 + 各带一个内联图标，并给「副本目录」输入行一套样式；交付后补齐极矮面板的提醒排版：正常模式正文限高、小窗/矮面板把提醒条贴底，按钮始终可点** | 接线测试查选择器 |
 | `js/ae-cache.js` | 743 | 偏好解析（按运行版本）、路径解码、目录定位、体积扫描、其他版本枚举、WER 崩溃史 | 是 |
-| `js/settings.js` | 163 | 默认值、schema 校验、脏数据归一化；1.6.0 起含 uiDefault（首屏视图） | 是 |
+| `js/settings.js` | 250 | 默认值、schema 校验、脏数据归一化；1.6.0 起含 uiDefault（首屏视图）；**1.6.4 起含 `backupDir` 与 `normStr`（路径只清语义、不判合法性）** | 是 |
 | `js/reminder.js` | 222 | 提醒调度、冷却、静音丢弃、稍后提醒；1.6.0 起产出 shortMsg（极简模式短消息） | 是 |
 | `js/guard.js` | 421 | 崩溃风险判定（提交内存 + 崩溃史）、六道安全闸 | 是 |
 | `js/trend.js` | 275 | 双字段采样、余量/缓存斜率、归因文案、ETA 格式化 | 是 |
-| `js/backup.js` | 100 | 回退副本命名、按路径哈希分夹、轮转保留份数、挑最新 | 是 |
-| `js/main.js` | 2829 | 展示与调度（唯一胶水层，技术债所在）；1.6.0 起 toast 落进面板内、首屏视图可配置、提醒摘要与预设 | 否（依赖 DOM） |
+| `js/backup.js` | 186 | 回退副本命名、按路径哈希分夹、轮转保留份数、挑最新、**落点决策 `pickRoot`** | 是 |
+| `js/main.js` | 3425 | 展示与调度（唯一胶水层，技术债所在）；1.6.0 起 toast 落进面板内、首屏视图可配置；**1.6.2 起副本列表逐份取回、小窗占用行；1.6.4 起回退落点可改、补发刷新链 P0 修复** | 否（依赖 DOM） |
 | `jsx/host.jsx` | 115 | ExtendScript：版本 / 工程状态 / 静默保存 | 是（假 AE 对象） |
 | `CSXS/manifest.xml` | 65 | CEP 注册、Host 区间、CEF 参数 | 接线测试查声明 |
 | `install.bat` / `uninstall.bat` | — | 安装卸载，写 `CSXS.6~12` 的 `PlayerDebugMode` | 否 |
 
 ### B.2 测试文件（18 个，不部署）
 
-`tests/` 下共 2841 行、789 项断言。**18 组全部不依赖本机装没装 AE**：13 组是纯逻辑 / 假 AE 对象 / 假 WER，5 组用 `_fixture.js` 造的假 AE 环境；新增第 18 组 `ui-interaction.test.js` 用纯 Node 造的最小 DOM **真的去点按钮**（覆盖 #13 那个 bug）。
+`tests/` 下共 3703 行、976 项断言。**18 组全部不依赖本机装没装 AE**：13 组是纯逻辑 / 假 AE 对象 / 假 WER，5 组用 `_fixture.js` 造的假 AE 环境；新增第 18 组 `ui-interaction.test.js` 用纯 Node 造的最小 DOM **真的去点按钮**（覆盖 #13 那个 bug）。
 `tests/_no-ae-sim.js` 可以把 `os.homedir()` 指到空目录复现 runner 环境，结论见 [7.5](#75-测试与装没装-ae的关系144-已修)。各文件覆盖范围见 [7.1](#71-总表)。
 
 ### B.3 文档

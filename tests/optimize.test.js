@@ -123,7 +123,8 @@ ok('driveOf 不再无条件读 process', /typeof process !== 'undefined'/.test(m
 ok('driveOf 用路径兜底判断盘符', /test\(String\(p\)\)/.test(mainJs));
 ok('CSS 显式压制 [hidden] 的 display 覆盖', /\[hidden\]\s*\{\s*display:\s*none\s*!important;\s*\}/.test(css));
 ok('抽屉默认带 hidden 属性', /<aside class="drawer" id="drawer" hidden>/.test(html0));
-ok('抽屉宽度仍受面板宽约束', /width:\s*min\(286px,\s*88vw\)/.test(css));
+ok('抽屉宽度仍受面板宽约束（1.7.0 去掉 min()：Chromium 79+，改成等价的 width + max-width）',
+   /\.drawer \{[\s\S]*?width:\s*286px;\s*max-width:\s*88vw;/.test(css));
 
 console.log('\n[8] 新增元素在 HTML 里且被引用');
 const html = read('index.html');

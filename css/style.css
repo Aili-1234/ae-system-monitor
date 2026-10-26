@@ -62,11 +62,13 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   padding-bottom: 11px;
   border-bottom: 1px solid var(--line);
 }
-.hd-left, .hd-right { display: flex; align-items: center; gap: 5px; min-width: 0; }
+/* ---------------- 顶栏 ---------------- */
+.hd > * + * { margin-left: 8px; }
+.hd-left, .hd-right { display: flex; align-items: center; min-width: 0; }
+.hd-left > * + *, .hd-right > * + * { margin-left: 5px; }
 .hd-left { flex: 1 1 auto; overflow: hidden; }
 .hd-right { flex: 0 0 auto; }
 
@@ -103,7 +105,7 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 /* 控件：一律无底色、无边框，靠 hover 提示可点 */
 .ibtn {
   width: 20px; height: 20px;
-  display: grid; place-items: center;
+  display: grid; align-items: center; justify-items: center;
   background: transparent;
   color: var(--fg-3);
   border: 0; border-radius: 3px;
@@ -154,11 +156,11 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 
 .card-hd {
   display: flex; align-items: baseline; justify-content: space-between;
-  gap: 8px;
   font-size: 9px; color: var(--fg-3);
   letter-spacing: .14em;
   margin-bottom: 9px;
 }
+.card-hd > * + * { margin-left: 8px; }
 .card-hd-r { color: var(--fg-3); font-size: 9.5px; letter-spacing: 0; }
 
 /* ---------------- 四个主项：默认收起，右上角展开 ---------------- */
@@ -235,11 +237,13 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 
 /* ---------------- 状态点（取代彩色胶囊） ---------------- */
 .pill {
-  display: inline-flex; align-items: center; gap: 5px;
+  display: inline-flex; align-items: center;
   font-size: 9.5px; letter-spacing: .04em;
   color: var(--fg-3);
   white-space: nowrap;
 }
+/* ---------------- 状态点（取代彩色胶囊） ---------------- */
+.pill > * + * { margin-left: 5px; }
 .pill::before {
   content: '';
   width: 5px; height: 5px; border-radius: 50%;
@@ -257,16 +261,18 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
   align-items: baseline;
   justify-content: space-between;
   flex-wrap: wrap;          /* 窄屏时「上限」换到下一行，别把右边挤出去 */
-  gap: 4px 8px;
+ 8px;
   margin-bottom: 9px;
 }
+/* ---------------- 缓存主区 ---------------- */
+.hero-main > * + * { margin-left: 4px; }
 
 .hero-used {
   display: flex;
   align-items: baseline;
-  gap: 7px;
   min-width: 0;
 }
+.hero-used > * + * { margin-left: 7px; }
 .hero-used > b {
   font-size: 27px;
   font-weight: 300;
@@ -284,11 +290,12 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 }
 
 .hero-quota {
-  display: flex; align-items: baseline; gap: 3px;
+  display: flex; align-items: baseline;
   flex: 0 0 auto;
   margin-left: auto;        /* 换行后仍靠右 */
   font-size: 9.5px; color: var(--fg-3);
 }
+.hero-quota > * + * { margin-left: 3px; }
 .hero-quota .lbl { color: var(--fg-3); }
 
 .qbtn {
@@ -305,7 +312,8 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 .qbtn:hover { color: var(--fg); border-bottom-color: var(--fg-3); }
 .qbtn em { font-style: normal; color: var(--fg-3); font-size: 8.5px; margin-left: 1px; }
 
-.qedit { display: inline-flex; align-items: center; gap: 2px; }
+.qedit { display: inline-flex; align-items: center; }
+.qedit > * + * { margin-left: 2px; }
 #quotaInput {
   width: 46px;
   background: transparent;
@@ -340,10 +348,11 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 .kv {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
-  gap: 10px;
+  grid-gap: 10px;
   margin-top: 12px;
 }
-.kv > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kv > div { display: flex; flex-direction: column; min-width: 0; }
+.kv > div > * + * { margin-top: 2px; }
 .kv span {
   font-size: 8.5px; color: var(--fg-3);
   letter-spacing: .1em; white-space: nowrap;
@@ -361,9 +370,10 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 .pathrow {
   display: flex;
   align-items: center;
-  gap: 6px;
   margin-top: 12px;
 }
+/* 路径行 */
+.pathrow > * + * { margin-left: 6px; }
 .path {
   flex: 1 1 auto; min-width: 0;
   font-size: 9px;
@@ -381,8 +391,41 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 /* 偏好版本不匹配：数字可能是别的版本的，必须显眼——错得「更安全」最难发现 */
 .path.txt.warn { color: var(--warn); }
 
+/* ---------------- 回退副本：最近三份（1.6.2 可逐份取回） ---------------- */
+.path.txt.clickable { cursor: pointer; }
+.bkl { display: flex; flex-direction: column; margin-top: 6px; }
+.bkl > * + * { margin-top: 4px; }
+.bkl[hidden] { display: none; }
+.bkl-r { display: flex; align-items: center; }
+.bkl-r > * + * { margin-left: 6px; }
+.bkl-t {
+  flex: 0 0 auto;
+  font-size: 9px; color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+.bkl-s {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 9px; color: var(--fg-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* 「旧位置」是个**来源标签**，不是警告 —— 它说的是「这份副本躺在 1.6.0 及以前的老目录里」，
+   副本本身完全可用、可取回。早先借的是 --warn（#c9a35e，与内存超线同一个黄），
+   等于用「出问题了」的颜色去标一个纯事实：一屏里两处黄，一处真告警、一处只是出处分不清。
+   改用中性灰 + 静态边框，靠**位置与形状**认出来，不占告警色。 */
+.bkl-o {
+  flex: 0 0 auto; font-size: 8px;
+  color: var(--fg-3); letter-spacing: .08em;
+  border: 1px solid var(--line-2); border-radius: 2px;
+  padding: 0 3px;
+}
+.bkl-r .ibtn { flex: 0 0 auto; }
+/* 面板窄到 150px 以下时，尺寸列会把三列挤成一团字：直接不显示，宁可少一列 */
+.bkl.narrow .bkl-s, .bkl.narrow .bkl-o { display: none; }
+
 /* ---------------- 内存环（细环） ---------------- */
-.gauge-row { display: flex; align-items: center; gap: 14px; }
+.gauge-row { display: flex; align-items: center; }
+/* ---------------- 内存环（细环） ---------------- */
+.gauge-row > * + * { margin-left: 14px; }
 
 .ring {
   --p: 0;
@@ -391,14 +434,16 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
   flex: 0 0 auto;
   width: 74px; height: 74px;
   border-radius: 50%;
-  display: grid; place-items: center;
-  background: conic-gradient(var(--rc) calc(var(--p) * 1%), var(--line) 0);
-  transition: background .45s linear;
+  display: flex; align-items: center; justify-content: center;
 }
-.ring::after {
-  content: ''; position: absolute; inset: 4px;
-  border-radius: 50%; background: var(--bg);
-}
+/* 环形图（1.7.0）：conic-gradient 要 Chromium 69+，换成内联 SVG 圆环，
+   CEP 8 的 Chromium 57 也能画。r=15.9155 让整圆周长正好 100 个单位，
+   进度 = stroke-dashoffset 100-p（由 main.js 写，不让 CSS calc 参与运算）。 */
+.arc { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.arc circle { fill: none; stroke-width: 1.95; }
+.arc-bg { stroke: var(--line); }
+.arc-fg { stroke: var(--rc, var(--fg-2)); stroke-dasharray: 100; stroke-dashoffset: 100;
+  transition: stroke .45s linear; }
 .ring > span {
   position: relative; z-index: 1;
   font-size: 16px; font-weight: 400;
@@ -432,18 +477,22 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 }
 
 /* ---------------- 磁盘 ---------------- */
-.disks { display: flex; flex-direction: column; gap: 11px; }
+.disks { display: flex; flex-direction: column; }
+/* ---------------- 磁盘 ---------------- */
+.disks > * + * { margin-top: 11px; }
 .disk { display: block; }
 
 .disk-top {
   display: flex; align-items: baseline; justify-content: space-between;
-  gap: 8px; margin-bottom: 5px;
+  margin-bottom: 5px;
 }
+.disk-top > * + * { margin-left: 8px; }
 .dname {
   font-size: 11px; font-weight: 500;
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center;
   font-variant-numeric: tabular-nums;
 }
+.dname > * + * { margin-left: 6px; }
 .tag {
   font-size: 8px; font-weight: 400;
   padding: 0 3px;
@@ -571,28 +620,44 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 
 /* ---------------- 底栏 ---------------- */
 .ft {
-  display: flex; justify-content: space-between; gap: 8px;
+  display: flex; justify-content: space-between;
   margin-top: 14px; padding-top: 9px;
   border-top: 1px solid var(--line);
   font-size: 9px; color: var(--fg-3);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+/* ---------------- 底栏 ---------------- */
+.ft > * + * { margin-left: 8px; }
 .ft span { overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------------- 底部堆叠区 ----------------
    1.6.0 新增。提醒条与提示框共用一个固定在面板底部的容器：
      · 容器宽度 = 面板宽度，提示框与提醒条都不会溢出到面板外
-     · 提醒在上、提示框在下，两者不再互相盖住
+     · 两者按顺序排开，不再互相盖住
    之前两者各自 position:fixed 挂在 body 上，窄面板时
-   提示框会横着溢出面板，动作按钮点不到。 */
+   提示框会横着溢出面板，动作按钮点不到。
+
+   容器贴着视口底边、高度由内容撑开，内容比面板高时**先顶出的是最上面那个**。
+   小窗（body.compact）因此把方向反过来（见下方 947 行附近）：提醒条贴底、
+   提示框叠在上面。提醒条要等用户处理、按钮必须能点；提示框几秒后自己消失。 */
 .bottom-stack {
   position: fixed; left: 0; right: 0; bottom: 0;
   z-index: 90;
   display: flex; flex-direction: column;
-  gap: 6px;
   padding: 8px 8px 8px;
   pointer-events: none;
 }
+/* ---------------- 底部堆叠区 ----------------
+   1.6.0 新增。提醒条与提示框共用一个固定在面板底部的容器：
+     · 容器宽度 = 面板宽度，提示框与提醒条都不会溢出到面板外
+     · 两者按顺序排开，不再互相盖住
+   之前两者各自 position:fixed 挂在 body 上，窄面板时
+   提示框会横着溢出面板，动作按钮点不到。
+
+   容器贴着视口底边、高度由内容撑开，内容比面板高时**先顶出的是最上面那个**。
+   小窗（body.compact）因此把方向反过来（见下方 947 行附近）：提醒条贴底、
+   提示框叠在上面。提醒条要等用户处理、按钮必须能点；提示框几秒后自己消失。 */
+.bottom-stack > * + * { margin-top: 6px; }
 .bottom-stack > * { pointer-events: auto; }
 
 /* ---------------- 吐司 ----------------
@@ -602,8 +667,14 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
    按钮渲染出来了但永远点不动。这次一并修掉。 */
 .toast-host {
   display: flex; flex-direction: column;
-  align-items: stretch; gap: 6px;
+  align-items: stretch;
 }
+/* ---------------- 吐司 ----------------
+   1.6.0 改版：提示框必须落在面板自己的显示框内，
+   并且 .show 时必须把 pointer-events 恢复成 auto ——
+   1.5.0 引入动作按钮（取回上一版）时漏了这一步，
+   按钮渲染出来了但永远点不动。这次一并修掉。 */
+.toast-host > * + * { margin-top: 6px; }
 .toast {
   position: relative;
   background: #262626; color: var(--fg);
@@ -613,9 +684,10 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
   transform: translateY(8px);
   transition: opacity .18s ease, transform .18s ease;
   white-space: normal;
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center;
   box-shadow: 0 2px 10px rgba(0, 0, 0, .45);
 }
+.toast > * + * { margin-left: 10px; }
 .toast-msg { flex: 1 1 auto; min-width: 0; word-break: break-word; }
 .toast-action {
   flex: 0 0 auto;
@@ -629,7 +701,10 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
    窄面板里横排的「文字 + 按钮」会把按钮挤出可视区，
    所以小窗下改成竖排 —— 文字一行、动作按钮独占一行并占满宽度。
    这是"按钮要在显示框内、能点到"这条要求在小窗侧的对应实现。 */
-body.compact .toast { flex-direction: column; align-items: stretch; gap: 6px; padding: 7px 9px; }
+body.compact .toast { flex-direction: column; align-items: stretch; padding: 7px 9px; }
+/* 基础规则给小窗提示框的子元素留了 margin-left: 10px（横排间距），小窗下改成竖排，
+   必须把这根轴归零，否则文字和按钮会横着错开。 */
+body.compact .toast > * + * { margin-left: 0; margin-top: 6px; }
 body.compact .toast-msg { font-size: 9.5px; }
 body.compact .toast-action {
   width: 100%;
@@ -641,7 +716,25 @@ body.compact .toast-action {
 /* ============================================================
    折叠小窗
    ============================================================ */
-.mini { display: none; }
+/* 小窗的所有尺寸都跟面板高度/宽度连续缩放，不设断点：
+   面板最矮就是 manifest 的 132px，而圆环 + 标签 + 两格 + 按钮固定值要 168px，
+   以前靠 body.compact{overflow:hidden} 直接裁掉底部 —— 现在按 vh 把圆环、间距、
+   内边距一起收，132px 时内容约 120px，能完整落在视口内。
+   宽度 ≤114px 时两格的图标连续收到 0，96px 下两列文字不再互相顶。
+   （.mini 自身 display:none，但自定义属性仍会被解析，compact 时直接可用。） */
+.mini {
+  /* 1.7.0：尺寸改成定值 + 离散断点（原来用 clamp() 连续缩放，那需要 Chromium 79+，
+     而 AE 2018/CEP 8 只到 57；连续缩放还依赖布局属性过渡补帧，正是用户报的
+     「缩放过渡有延迟」的来源）。断点是离散的，拖动面板一步到位，不需要过渡。 */
+  --mini-ring: 64px;
+  --mini-gap: 9px;
+  --mini-gap-x: 16px;
+  --mini-pad-y: 10px;
+  --mini-pad-x: 6px;
+  --mini-icon: 9px;
+  --mini-icon-gap: 2px;
+  display: none;
+}
 
 body.compact { overflow: hidden; }
 body.compact .app { display: none; }
@@ -650,27 +743,27 @@ body.compact .mini {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 9px;
   min-height: 100%;
-  padding: 10px 6px;
+  padding: var(--mini-pad-y) var(--mini-pad-x);
 }
+/* 1.7.0 小窗分两栏：左 .mini-main（环 + 主显示名）、右 .mini-side（两格 + 按钮）。
+   竖排时两栏上下叠（间距还是 --mini-gap），横排由下面的媒体查询切。 */
+.mini-main, .mini-side { display: flex; flex-direction: column; align-items: center; }
+.mini-main .mini-label { margin-top: var(--mini-gap); }
+.mini-main + .mini-side { margin-top: var(--mini-gap); }
+.mini-side .mini-row { margin-top: var(--mini-gap); }
 
 .mini-ring {
   --p: 0;
   --rc: var(--fg-2);
   position: relative;
-  width: 64px; height: 64px;
+  width: var(--mini-ring); height: var(--mini-ring);
   border-radius: 50%;
   border: 0; padding: 0;
-  background: conic-gradient(var(--rc) calc(var(--p) * 1%), var(--line) 0);
-  display: grid; place-items: center;
+  display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  transition: background .45s linear;
 }
-.mini-ring::after {
-  content: ''; position: absolute; inset: 4px;
-  border-radius: 50%; background: var(--bg);
-}
+.mini-ring .arc circle { stroke-width: 2.25; }
 .mini-ring > span {
   position: relative; z-index: 1;
   font-size: 12.5px; font-weight: 400;
@@ -687,23 +780,67 @@ body.compact .mini {
 }
 
 .mini-label {
+  display: flex; align-items: center;   /* 1.6.5：标签前也带一个同款图标 */
   font-size: 8.5px;
   color: var(--fg-3);
   letter-spacing: .14em;
 }
-.mini-row { display: flex; gap: 2px; }
+.mini-label > * + * { margin-left: 3px; }
+.mini-label .mi {
+  width: 9px; height: 9px; flex: 0 0 auto;
+  fill: none; stroke: var(--fg-3); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
+}
+/* 小窗占用行：左缓存、右内存，**整组居中**并各带一个图标（用户：往中间靠一点、带些图标）。
+   gap 跟面板宽度连续缩放：200px 上 16px、96px 收到 5.6px；宽度不足 114px 时两格的
+   图标连续收到 0（96px 两列各约 41px），最窄档也不会把文字挤到一起。
+   （旧版 width:100% + space-between + 右列 text-align:right，把两列顶到面板两侧。） */
+.mini-stats {
+  max-width: 100%;
+  display: flex; align-items: flex-end; justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+.mini-stats .ms + .ms { margin-left: var(--mini-gap-x); }
+/* 没选指标的那一格（以及两格都没选时的整行）不占位置。
+   注意 .mini-stats 自己有 display:flex，会压过 UA 的 [hidden]{display:none}，必须显式写。 */
+.mini-stats[hidden], .mini-stats .ms[hidden] { display: none; }
+.mini-stats .ms { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.mini-stats .ms > * + * { margin-top: 1px; }
+.mini-stats .ms-h { display: flex; align-items: center; min-width: 0; }
+/* 图标与文字之间原本靠 flex gap（Chromium 84+），改成 i 的 margin-left：
+   图标宽度在窄档会被断点收到 0，margin 也跟着变量一起收，不需要额外断点。 */
+.mini-stats .ms-h i { margin-left: var(--mini-icon-gap); }
+.mini-stats .mi {
+  width: var(--mini-icon); height: var(--mini-icon); flex: 0 0 auto;
+  fill: none; stroke: var(--fg-3); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
+}
+.mini-stats .ms.on .mi { stroke: var(--warn); }
+.mini-stats .ms.bad .mi { stroke: var(--bad); }
+.mini-stats i {
+  font-style: normal; font-size: 8px;
+  color: var(--fg-3); letter-spacing: .06em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mini-stats b {
+  font-size: 9.5px; font-weight: 400; color: var(--fg-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mini-stats .ms.on b { color: var(--warn); }
+.mini-stats .ms.bad b { color: var(--bad); }
+
+.mini-row { display: flex; }
+.mini-row > * + * { margin-left: 2px; }
 
 /* ============================================================
    设置抽屉
    ============================================================ */
 .mask {
-  position: fixed; inset: 0;
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;
   background: rgba(0, 0, 0, .55);
   z-index: 60;
 }
 .drawer {
   position: fixed; top: 0; right: 0; bottom: 0;
-  width: min(286px, 88vw);
+  width: 286px; max-width: 88vw;
   background: #1c1c1c;
   border-left: 1px solid var(--line);
   z-index: 61;
@@ -731,13 +868,14 @@ body.compact .mini {
 }
 
 .row {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center;
   padding: 6px 0;
   font-size: 11px; color: var(--fg-2);
   /* 窄面板下一行塞不下就整行换行，不硬挤 ——
      硬挤的结果是标签文字溢出、压到右边的输入框/单位上。 */
   flex-wrap: wrap;
 }
+.row > * + * { margin-left: 8px; }
 .row > label {
   flex: 1 1 auto;
   cursor: pointer;
@@ -806,7 +944,6 @@ input[type="checkbox"]:checked { background: var(--fg-2); border-color: var(--fg
 .remind {
   position: relative;
   display: flex;
-  gap: 10px;
   align-items: flex-start;
   padding: 10px 11px;
   background: #212121;
@@ -815,6 +952,10 @@ input[type="checkbox"]:checked { background: var(--fg-2); border-color: var(--fg
   border-radius: 3px;
   animation: remindIn .18s ease-out;
 }
+/* ============================================================
+   提醒条（无声音，纯视觉）
+   ============================================================ */
+.remind > * + * { margin-left: 10px; }
 .remind.warn { border-left-color: var(--warn); }
 @keyframes remindIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
@@ -830,7 +971,8 @@ input[type="checkbox"]:checked { background: var(--fg-2); border-color: var(--fg
 .rm-txt span.expanded { color: var(--fg); }
 .rm-txt b[title] { cursor: pointer; }
 .rm-txt b[title]:hover { color: var(--fg); text-decoration: underline dotted var(--fg-3); }
-.rm-act { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+.rm-act { display: flex; flex-direction: column; flex: 0 0 auto; }
+.rm-act > * + * { margin-top: 4px; }
 .rm-act button {
   background: transparent;
   border: 1px solid var(--line-2);
@@ -843,32 +985,198 @@ input[type="checkbox"]:checked { background: var(--fg-2); border-color: var(--fg
   transition: color .12s, border-color .12s;
 }
 .rm-act button:hover { color: var(--fg); border-color: var(--fg-3); }
+/* 正常模式显示完整动作名；小窗换成两个字（下面 body.compact 段切换）。
+   96px 实测：完整文案两个按钮右边界到 124px，关闭按钮直接落在面板外，点不到。 */
+.rm-act .rm-short { display: none; }
 
 /* 小窗（极简）模式下的提醒条：
-   面板只有 100~120px 宽，横排三段（图标/文字/按钮）必然挤爆。
-   这里改成竖排：图标+标题一行，消息折叠，动作按钮横排一行占满宽度。
-   按钮变大是为了在窄面板里好点 —— 这是"提示框要在显示框内、
-   方便点击交互按钮"这条要求在小窗侧的对应实现。 */
-body.compact .bottom-stack { padding: 6px; gap: 5px; }
-body.compact .remind {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  padding: 8px 9px;
+   面板只有 96~120px 宽、最矮 132px，横排三段（图标/文字/按钮）必然挤爆。
+   这里改成两行网格：图标+标题并排，动作按钮横排独占一行。
+   （早先是 flex 竖排，图标单独占一行，白白吃掉 ~20px；96×132 下展开长消息时
+   整条长到 180px，顶部被推出视口，用户只看得到后半截文字。）
+   按钮横排占满宽度是为了在窄面板里好点 —— 这是"提示框要在显示框内、
+   方便点击交互按钮"这条要求在小窗侧的对应实现。
+   方向反过来：提醒条贴住底边，提示框叠在它上方。96×132 下两者同时出现时，
+   正序会把提醒条（含按钮）整段顶出视口（实测 bar top=-61、按钮 top=-15）；
+   反序后提醒条完整可见，先裁掉的是几秒后自己消失的提示框。 */
+body.compact .bottom-stack {
+  padding: 6px;
+  flex-direction: column-reverse;
 }
-body.compact .rm-ico { font-size: 15px; align-self: flex-start; }
+body.compact .bottom-stack > * + * { margin-top: 5px; }
+body.compact .remind {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "ico txt"
+    "act act";
+  align-items: start;
+  grid-column-gap: 6px;
+  grid-row-gap: 5px;
+  padding: 7px 8px;
+}
+body.compact .rm-ico {
+  grid-area: ico;
+  align-self: start;
+  font-size: 13px;
+  line-height: 1.35;
+}
+body.compact .rm-txt { grid-area: txt; }
 body.compact .rm-txt b { font-size: 10.5px; }
 body.compact .rm-txt span { font-size: 9.5px; margin-top: 2px; }
-body.compact .rm-act { flex-direction: row; gap: 5px; }
+body.compact .rm-act { grid-area: act; flex-direction: row; }
+/* 基础规则是竖排（margin-top: 4px），小窗切成横排，换成左间距 */
+body.compact .rm-act > * + * { margin-top: 0; margin-left: 4px; }
 body.compact .rm-act button {
   flex: 1 1 auto;
-  font-size: 9.5px;
-  padding: 4px 6px;
+  min-width: 0;
+  font-size: 9px;
+  padding: 4px 5px;
   color: var(--fg-2);
   border-color: var(--line-2);
 }
+body.compact .rm-act .rm-full { display: none; }
+body.compact .rm-act .rm-short { display: inline; }
 body.compact .rm-act button:hover { color: var(--fg); border-color: var(--fg-3); }
 /* 小窗里不需要长消息，它会把按钮挤到看不见 */
 body.compact .rm-txt span { max-height: 2.9em; overflow: hidden; }
-/* 但用户主动点开完整消息时，必须能看全 */
-body.compact .rm-txt span.expanded { max-height: none; overflow: visible; }
+/* 用户主动点开完整消息时：正文区自己滚，标题和按钮留在原位。
+   减掉的 79px = 底部容器(12+5) + 提醒条内边距(14) + 标题行(30) + 行距(5) + 按钮(24) + 上下余量(6)，
+   实测固定部分 62px；96×132 下正文约 53px 高（三行半），整条顶部仍留 6px，
+   按钮始终在视口内。 */
+body.compact .rm-txt span.expanded {
+  max-height: calc(100vh - 79px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* 默认滚动条在 65px 宽的正文里要吃掉 14px，还带上下箭头；改成 4px 的暗色细条。
+   注意别在这里写标准属性 scrollbar-width/scrollbar-color —— Chromium 一旦看到
+   它们就会忽略下面的 ::-webkit-scrollbar，反而退回系统滚动条。 */
+body.compact .rm-txt span.expanded::-webkit-scrollbar { width: 4px; }
+body.compact .rm-txt span.expanded::-webkit-scrollbar-track { background: transparent; }
+body.compact .rm-txt span.expanded::-webkit-scrollbar-thumb {
+  background: var(--line-2); border-radius: 2px;
+}
+
+/* 96/130px 档：图标再占 19px，正文只剩约 49px（短消息都会折成两行）。
+   这一档去掉装饰图标，把整行宽度让给文字；140px 以上继续保留。 */
+@media (max-width: 140px) {
+  body.compact .remind {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "txt"
+      "act";
+  }
+  body.compact .rm-ico { display: none; }
+}
+
+/* 极矮面板（manifest 最小 132px）：正常模式的提醒条是「图标 | 文字 | 右列按钮」，
+   200px 宽时长句折成 7~8 行，整条长到 166px；底部对齐会把顶部连同两个按钮
+   一起推出视口（实测 200×132 长消息：rmSnooze top=-36、rmOk top=-13）。
+
+   第一道：限正文自身高度。标题和右列按钮不参与滚动，始终留在原位。
+   `3.6em` 是 10px 字体的三行半，作为 132px 面板下的下限；
+   `100vh - 110px` 在稍高的面板里给底部容器留出提示框的位置，正文随高度多露几行。
+   实测 200×132：正文 2 行、整条 78px，标题和两个按钮都在视口内。
+   面板 ≥ 234px 后正文自然高度低于限高，这条不生效，长消息照旧全文显示。
+   点标题展开（.expanded）时取消这层限高，由下面整条限高兜底。 */
+body:not(.compact) .rm-txt span {
+  /* 1.7.0：原来的 max(3.6em, calc(100vh - 110px)) 用了 CSS max()（Chromium 79+）。
+     两者的交叉点在面板高 146px（100vh-110px == 3.6em == 36px），
+     所以直接用断点表达同样的语义，效果逐像素等价。 */
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body:not(.compact) .rm-txt span.expanded {
+  max-height: none;
+  overflow-y: visible;
+}
+body:not(.compact) .rm-txt span::-webkit-scrollbar { width: 4px; }
+body:not(.compact) .rm-txt span::-webkit-scrollbar-track { background: transparent; }
+body:not(.compact) .rm-txt span::-webkit-scrollbar-thumb {
+  background: var(--line-2); border-radius: 2px;
+}
+
+/* 第二道（展开态兜底）：整条限高、内部滚动，顶部不会跑到视口外 */
+body:not(.compact) .remind {
+  max-height: calc(100vh - 18px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body:not(.compact) .remind::-webkit-scrollbar { width: 4px; }
+body:not(.compact) .remind::-webkit-scrollbar-track { background: transparent; }
+body:not(.compact) .remind::-webkit-scrollbar-thumb {
+  background: var(--line-2); border-radius: 2px;
+}
+
+/* 面板矮到预警区时，正常模式和上面小窗一样把堆叠方向反过来：
+   提醒条贴住底边，提示框叠在上方。原因是提醒条要等用户处理、按钮必须能点；
+   提示框几秒后自己消失，被裁掉也只是短暂的信息损失。不反过来时，
+   一条带按钮的提示框（实测 200×132 高约 43px）会把整摞顶出 17px 以上，
+   提醒条标题和右列按钮最先被裁。面板 ≥ 240px 后两者通常都放得下，保持原顺序。 */
+@media (max-height: 240px) {
+  body:not(.compact) .bottom-stack { flex-direction: column-reverse; }
+}
+
+/* 1.6.4：回退副本目录（落点可改）
+   输入框独占一行：路径可以很长，跟别的小控件挤在一行只会被压成竖排字（1.6.1 的教训）。 */
+.row #inBkDir {
+  flex: 1 1 auto; min-width: 0;
+  height: 20px; padding: 0 6px;
+  font-family: inherit; font-size: 9.5px;
+  color: var(--fg); background: var(--bg-hi);
+  border: 1px solid var(--line); border-radius: 3px;
+  outline: none;
+}
+.row #inBkDir::placeholder { color: var(--fg-3); }
+.row #inBkDir:focus { border-color: var(--fg-2); }
+
+/* ============================================================
+   1.7.0 老 AE 兼容：离散断点
+   ------------------------------------------------------------
+   下面这些原来都是 clamp()/calc(100vw) 的连续缩放（需要 Chromium 79+，
+   而 AE 2018 / CEP 8 带的是 57）。改成断点后：
+     · 老宿主不会因为整条声明失效而丢掉尺寸（clamp 不认识时整条声明无效）；
+     · 拖动面板时一步到位，不依赖布局属性过渡（用户报的「缩放有延迟」）。
+   档位按面板"能不能放下竖排"来切：
+     高 ≥ 234px  完整档（64 环）
+     ≤ 200px     中档（56 环）
+     ≤ 160px     矮档（48 环，132px 最小高度下也放得下）
+     宽 ≤ 170px  图标降到 6px
+     宽 ≤ 140px  图标收 0（96px 档两列文字不再互相顶）
+   ============================================================ */
+@media (max-height: 200px) {
+  .mini { --mini-ring: 56px; --mini-gap: 7px; --mini-gap-x: 13px; --mini-pad-y: 8px; }
+}
+@media (max-height: 160px) {
+  .mini { --mini-ring: 48px; --mini-gap: 5px; --mini-gap-x: 10px; --mini-pad-y: 6px; --mini-pad-x: 5px; }
+}
+@media (max-width: 170px) {
+  .mini { --mini-icon: 6px; --mini-icon-gap: 1px; }
+}
+/* 面板变矮就横排（用户 2026-10-26 截图要求：矮的时候主显示去左边、次显示去右边）。
+   竖排要 170px 左右才放得下；96px 档太窄横排放不下 —— min-width 把它挡在外面，
+   那一档继续走缩小竖排。纯 CSS，随拖动实时生效，不占刷新周期。 */
+@media (max-height: 170px) and (min-width: 150px) {
+  body.compact .mini { flex-direction: row; }
+  .mini-main { margin-right: var(--mini-gap-x); }
+  .mini-main + .mini-side { margin-top: 0; }
+  .mini-side { align-items: flex-start; }
+  .mini-side .mini-stats { flex-direction: column; align-items: flex-start; }
+  .mini-side .mini-stats .ms + .ms { margin-left: 0; margin-top: 1px; }
+  .mini-side .ms { align-items: flex-start; }
+  .mini-side .mini-row { margin-top: 4px; }
+}
+@media (max-width: 140px) {
+  .mini { --mini-icon: 0px; --mini-icon-gap: 0px; --mini-gap-x: 6px; }
+  .mini-ring > span { font-size: 11px; }
+  .mini-stats i { font-size: 7.5px; }
+  .mini-stats b { font-size: 9px; }
+}
+@media (max-width: 160px) {
+  .mini-ring > span { font-size: 11.5px; }
+}
+@media (max-height: 146px) {
+  body:not(.compact) .rm-txt span { max-height: 3.6em; }
+}

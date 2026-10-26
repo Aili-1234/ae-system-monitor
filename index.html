@@ -97,7 +97,10 @@
       <button class="tg" id="tgMem" aria-expanded="false" title="展开细节"></button>
     </div>
     <div class="gauge-row">
-      <div class="ring" id="ramRing" style="--p:0"><span id="ramPct">--</span></div>
+      <div class="ring" id="ramRing" style="--p:0">
+        <svg class="arc" viewBox="0 0 36 36" aria-hidden="true"><circle class="arc-bg" cx="18" cy="18" r="15.9155" /><circle class="arc-fg" cx="18" cy="18" r="15.9155" /></svg>
+        <span id="ramPct">--</span>
+      </div>
       <div class="gauge-side">
         <div class="v" id="ramUsed">-- / --</div>
         <div class="sub" id="ramFree">空闲 --</div>
@@ -145,6 +148,7 @@
         <button id="btnBkOpen" class="ibtn sm" title="打开备份文件夹">↗</button>
         <button id="btnBkRestore" class="ibtn sm" title="取回最近一份（生成副本，不动原文件）">↺</button>
       </div>
+      <div class="bkl" id="bkList" hidden></div>
       <div class="ae-line" id="aeProject" title="">—</div>
       <div class="ae-line dim" id="aeExtra"></div>
       <div class="ae-line dim" id="aeVer"></div>
@@ -160,13 +164,25 @@
 
 <!-- ==================== 折叠小窗 ==================== -->
 <div class="mini" id="miniView">
-  <button class="mini-ring" id="miniRing" style="--p:0" title="点击展开">
+  <!-- 1.7.0：包成两栏（左环右数值），面板变矮时用媒体查询横过来 -->
+  <div class="mini-main">
+  <button class="mini-ring" id="miniRing" title="点击展开">
+    <svg class="arc" viewBox="0 0 36 36" aria-hidden="true"><circle class="arc-bg" cx="18" cy="18" r="15.9155" /><circle class="arc-fg" cx="18" cy="18" r="15.9155" /></svg>
     <span id="miniPct">--</span>
   </button>
-  <div class="mini-label" id="miniLabel">缓存</div>
+  <div class="mini-label"><svg class="mi" id="miMain" viewBox="0 0 10 10" aria-hidden="true"></svg><span id="miniLabel">缓存</span></div>
+  </div>
+  <div class="mini-side">
+  <!-- 两格是「插槽」：显示哪个指标由设置决定（1.6.5），图标与文字由 main.js 填。
+       空插槽 hidden 掉，不占位置。两格属于右栏 —— 面板变矮横过来时它在环的右侧。 -->
+  <div class="mini-stats" id="miniStats">
+    <span class="ms" id="ms1"><span class="ms-h"><svg class="mi" id="mi1" viewBox="0 0 10 10" aria-hidden="true"></svg><i id="ml1">--</i></span><b id="mv1">--</b></span>
+    <span class="ms" id="ms2"><span class="ms-h"><svg class="mi" id="mi2" viewBox="0 0 10 10" aria-hidden="true"></svg><i id="ml2">--</i></span><b id="mv2">--</b></span>
+  </div>
   <div class="mini-row">
     <button class="ibtn sm" id="miniExpand" title="展开面板">↗</button>
     <button class="ibtn sm" id="miniCfg" title="设置">≡</button>
+  </div>
   </div>
 </div>
 
@@ -185,13 +201,21 @@
         <input type="checkbox" id="cbAuto" />
         <label for="cbAuto">面板变窄时自动折叠</label>
       </div>
+      <!-- 三个下拉的选项由 js/settings.js 的 MINI_MAIN / MINI_SUB 生成（唯一出处），
+           这里留空即可 —— 选项清单不会和 main.js 的取值逻辑各写一份。 -->
       <div class="row">
-        <label for="selMetric">小窗显示</label>
-        <select id="selMetric">
-          <option value="cache">缓存填充率</option>
-          <option value="mem">内存占用</option>
-        </select>
+        <label for="selMetric">小窗主显示</label>
+        <select id="selMetric"></select>
       </div>
+      <div class="row">
+        <label for="selSub1">小窗次显示 1</label>
+        <select id="selSub1"></select>
+      </div>
+      <div class="row">
+        <label for="selSub2">小窗次显示 2</label>
+        <select id="selSub2"></select>
+      </div>
+      <div class="hint" id="miniHint"></div>
       <div class="row">
         <label for="selUiDefault">首屏视图</label>
         <select id="selUiDefault">
@@ -306,6 +330,15 @@
         <input type="number" id="inKeep" min="1" max="20" step="1" />
         <span class="u">份</span>
       </div>
+      <div class="row">
+        <label for="inBkDir">副本目录</label>
+        <input type="text" id="inBkDir" placeholder="默认：工程目录旁" spellcheck="false" />
+      </div>
+      <div class="hint" id="bkDirHint"></div>
+      <div class="row">
+        <button class="ibtn sm wide" id="btnBkDirPick" type="button" title="选一个别的盘存放回退副本">选择目录…</button>
+        <button class="ibtn sm wide" id="btnBkDirReset" type="button" title="回到默认位置（工程目录旁）">用默认</button>
+      </div>
 
       <div class="row">
         <label for="inGuardHold">最多攒</label>
@@ -334,18 +367,18 @@
 
 <!-- ==================== 底部堆叠区 ====================
      提醒条与提示框共用一个底部容器：两者都在面板自己的显示框内，
-     而且不会互相盖住 —— 提醒在上、提示框在下。
+     而且不会互相盖住 —— 正常模式提醒在上，小窗反过来（提醒贴底、提示框在上）。
      放在 body 层（而不是 .app 内）是为了折叠成小窗时提示框依然可见。 -->
 <div class="bottom-stack" id="bottomStack">
   <div class="remind" id="remindBar" hidden>
     <span class="rm-ico" id="rmIco">•</span>
     <div class="rm-txt">
-      <b id="rmTitle" title="点击查看完整提示">—</b>
+      <b id="rmTitle" title="点击展开 / 收起完整提示">—</b>
       <span id="rmMsg"></span>
     </div>
     <div class="rm-act">
-      <button id="rmSnooze">稍后 10 分</button>
-      <button id="rmOk">知道了</button>
+      <button id="rmSnooze" title="10 分钟后再提醒"><span class="rm-full">稍后 10 分</span><span class="rm-short">稍后</span></button>
+      <button id="rmOk" title="关闭提醒"><span class="rm-full">知道了</span><span class="rm-short">关闭</span></button>
     </div>
   </div>
   <div class="toast-host" id="toastHost"></div>

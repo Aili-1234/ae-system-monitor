@@ -227,12 +227,17 @@ ok('小窗下提示框改竖排（文字与按钮分行）',
    /body\.compact \.toast\s*\{[^}]*flex-direction:\s*column/.test(css));
 ok('小窗下提醒按钮横排占满',
    /body\.compact \.rm-act button\s*\{[^}]*flex:\s*1 1 auto/.test(css));
-ok('小窗下提醒条竖排',
-   /body\.compact \.remind\s*\{[^}]*flex-direction:\s*column/.test(css));
-ok('小窗下长消息限高（不挤掉按钮）',
-   /body\.compact \.rm-txt span\s*\{[^}]*max-height/.test(css));
-ok('展开态不限高（点开能看全）',
-   /body\.compact \.rm-txt span\.expanded\s*\{[^}]*max-height:\s*none/.test(css));
+ok('小窗下提醒条改两行网格并贴底（提示框叠在上方）',
+   /body\.compact \.remind\s*\{[^}]*display:\s*grid[^}]*grid-template-areas:\s*"ico txt"\s*"act act"/.test(css) &&
+   /body\.compact \.bottom-stack\s*\{[^}]*flex-direction:\s*column-reverse/.test(css));
+ok('两种模式的长消息都限高（不挤掉按钮；1.7.0 max() → calc + 146px 断点）',
+   /body\.compact \.rm-txt span\s*\{[^}]*max-height/.test(css) &&
+   /body:not\(\.compact\) \.rm-txt span\s*\{[^}]*max-height:\s*calc\(100vh - 110px\)/.test(css) &&
+   /@media \(max-height: 146px\)\s*\{[^}]*body:not\(\.compact\) \.rm-txt span\s*\{[^}]*max-height:\s*3\.6em/.test(css));
+ok('展开态正文自己滚，按钮仍在视口内（两种模式矮面板都反过来贴底）',
+   /body\.compact \.rm-txt span\.expanded\s*\{[^}]*max-height:\s*calc\(100vh - 79px\)[^}]*overflow-y:\s*auto/.test(css) &&
+   /body:not\(\.compact\) \.rm-txt span\.expanded\s*\{[^}]*max-height:\s*none/.test(css) &&
+   /@media \(max-height: 240px\)\s*\{[^}]*body:not\(\.compact\) \.bottom-stack\s*\{[^}]*flex-direction:\s*column-reverse/.test(css));
 
 console.log('\n[10] 极简模式的消息切换');
 {
@@ -254,6 +259,171 @@ console.log('\n[10] 极简模式的消息切换');
   ok('短消息明显更短', fired[0].shortMsg.length < fired[0].msg.length,
      fired[0].shortMsg.length + ' < ' + fired[0].msg.length);
   ok('完整消息保留（能点开看）', fired[0].msg.length > fired[0].shortMsg.length);
+}
+
+/* ---------------- 刷新闸门不许被异常钉死（P0，2026-10-26）----------------
+ * 起因：面板能在真机 AE + 真 CEP 上被**一次异常永久卡死**。
+ *   实测（注入实验，连点 ⟳ 三次）：只有第一拍越过 `if (ST.busy) return`，
+ *   后两拍全被挡在闸门外（3 次点击只过 1 次），静置 8 秒也不恢复，
+ *   只有重载面板才救得回来。
+ *   根因：`ST.busy = true` 之后只有 Promise.all 链上挂了 .catch；
+ *   同步区（renderMem / drawSpark / renderDisks / updateDisks …）与
+ *   `readAE` 的回调体**都不在任何 catch 里** —— 任何一处抛出，busy 永久为 true。
+ *
+ * 测法沿用本文件既有套路：**从 main.js 抠出真实的三段实现**
+ * （refreshFail / guardRefresh / refresh），喂桩依赖后真跑。
+ * 同步区抛异常时整个过程是纯同步的，不必等 Promise。
+ * 尺子 = 「第几次调用真的越过了闸门」：
+ *   破损代码 1（第 1 次越过，异常把 busy 钉死，后两次在闸门就被挡）
+ *   修复代码 3
+ */
+console.log('\n[11] 刷新闸门不被异常钉死（P0）');
+
+function extractFn(src, sig) {
+  const start = src.indexOf(sig);
+  if (start < 0) return null;
+  let i = src.indexOf('{', start), depth = 0, end = -1;
+  for (let k = i; k < src.length; k++) {
+    if (src[k] === '{') depth++;
+    else if (src[k] === '}') { depth--; if (depth === 0) { end = k; break; } }
+  }
+  return end < 0 ? null : src.slice(start, end + 1);
+}
+
+const FN_DEPS = ['ST', 'CFG', 'AE', '$', 'readMem', 'updateDisks', 'updateCommit', 'renderMem',
+  'drawSpark', 'renderDisks', 'readAE', 'toast', 'renderRenderBadge', 'startTimer',
+  'deriveCachePath', 'computeMetrics', 'renderCache', 'scanCache', 'scanMedia',
+  'scanOtherVersions', 'sampleCache', 'evaluateGuard', 'renderAll', 'console'];
+
+function buildRefresh(over) {
+  const parts = ['refreshFail', 'guardRefresh', 'refresh']
+    .map(n => extractFn(mainJs, 'function ' + n + '('));
+  if (parts.some(p => !p)) return null;
+  const stub = () => {};
+  const base = {
+    ST: { busy: false, interval: 0, mem: null, hist: [], proj: {}, cache: {},
+          prefs: null, prefsFor: '', autoSave: null, crashAt: 0, prevRq: 0,
+          renderMuted: 0, lastAutoSaved: null, lastAutoSavedAt: 0 },
+    CFG: { histMax: 60 },
+    AE: null,                 // 所有 AE 调用都写在 `AE &&` 后面，桩不必实现
+    $: () => ({ classList: { remove: stub, add: stub }, style: {}, textContent: '' }),
+    readMem: () => null, updateDisks: stub, updateCommit: stub, renderMem: stub,
+    drawSpark: stub, renderDisks: stub, readAE: stub, toast: stub,
+    renderRenderBadge: stub, startTimer: stub, deriveCachePath: stub,
+    computeMetrics: stub, renderCache: stub,
+    scanCache: () => Promise.resolve(), scanMedia: () => Promise.resolve(),
+    scanOtherVersions: () => Promise.resolve(),
+    sampleCache: stub, evaluateGuard: stub, renderAll: stub,
+    console: { error: stub }
+  };
+  const cfg = Object.assign(base, over || {});
+  const factory = new Function(...FN_DEPS, parts.join('\n') + '\nreturn refresh;');
+  return factory(...FN_DEPS.map(k => cfg[k]));
+}
+
+/* 点 ⟳ 三次，返回「异常逃出 refresh 的次数」；hits 由抛异常的桩自己数。 */
+function gateRig(over, label) {
+  const hits = { n: 0 };
+  const boom = function () { hits.n++; throw new Error('BOOM'); };
+  const ov = Object.assign({}, over);
+  if (ov.syncBoom) ov.renderMem = boom;
+  if (ov.cbBoom) { ov.readAE = fn => fn({}); ov.renderCache = boom; }
+  const run = buildRefresh(ov);
+  if (typeof run !== 'function') {
+    ok(label + '：能抠出 refreshFail / guardRefresh / refresh', false, 'main.js 里缺其中之一');
+    ok(label + '：3 次点击都越过闸门', false, '--');
+    return;
+  }
+  let escaped = 0;
+  for (let i = 0; i < 3; i++) { try { run(); } catch (e) { escaped++; } }
+  ok(label + '：3 次点击都越过闸门（异常不许把 busy 钉死）',
+     hits.n === 3, '越过 ' + hits.n + ' 次 / 3');
+  ok(label + '：异常不再逃出 refresh（被兜住）', escaped === 0, escaped + ' 次逃逸');
+}
+
+ok('main.js 有 refreshFail（异常复位 busy 的唯一入口）',
+   /function refreshFail/.test(mainJs));
+ok('readAE 的回调体被 guardRefresh 包住（异步回调里的异常也抓得住）',
+   /readAE\(guardRefresh\(function/.test(mainJs));
+gateRig({ syncBoom: true }, '同步区抛异常');
+gateRig({ cbBoom: true }, '回调体抛异常');
+
+
+/* ---------------- [12] 刷新链异常后 busy 必须复位（1.6.3 审计的 P0） ----------------
+ * 症状：refresh() 的 ST.busy 门只在 Promise.all(...).then/.catch 两个回调里复位。
+ *       只要那段前置逻辑（renderMem / drawSpark / renderDisks）抛一次异常，
+ *       busy 就永久为 true —— 面板停止刷新，连手动点 ⟳ 都进不去，只能重载面板。
+ * 做法：把 refreshFail / guardRefresh 从 main.js 里**抠出来真跑一遍**（与 [1] 的 toast 同一手法）。 */
+console.log('\n[12] 刷新链异常后 busy 必须复位（P0）');
+{
+  const pick = (sig) => {
+    const p = mainJs.indexOf('function ' + sig);
+    if (p < 0) return null;
+    let i = mainJs.indexOf('{', p), depth = 0, end = -1;
+    for (let k = i; k < mainJs.length; k++) {
+      if (mainJs[k] === '{') depth++;
+      else if (mainJs[k] === '}') { depth--; if (depth === 0) { end = k; break; } }
+    }
+    return end < 0 ? null : mainJs.slice(p, end + 1);
+  };
+  const a = pick('refreshFail'), b = pick('guardRefresh');
+  ok('main.js 里有 refreshFail 与 guardRefresh', !!a && !!b);
+  ok('readAE 的回调被 guardRefresh 包住（回调是异步跑的，外面的 try 抓不到它）',
+     /readAE\(guardRefresh\(function/.test(mainJs));
+  ok('前置段自己有 try/catch 且 catch 里 return（不再往下走到 readAE）',
+     /\} catch \(e\) \{[\r\n\s]*refreshFail\(e\);\s*[\r\n\s]*return;/.test(mainJs));
+
+  if (a && b) {
+    const body = (a + '\n' + b)
+      .replace('function refreshFail', 'var refreshFail = function')
+      .replace('function guardRefresh', 'var guardRefresh = function');
+    const factory = new Function('ST', 'console',
+      body + '\nreturn { refreshFail: refreshFail, guardRefresh: guardRefresh };');
+    const ST = { busy: true };
+    const G = factory(ST, { error() {} });
+    ok('抠出来的两个函数都可用', typeof G.refreshFail === 'function' && typeof G.guardRefresh === 'function');
+
+    ST.busy = true;
+    let threw = false;
+    try { G.guardRefresh(function () { throw new Error('模拟渲染期异常'); })({}); }
+    catch (e) { threw = true; }
+    ok('回调抛异常时不往外冒（不炸掉 readAE 的回调链）', !threw);
+    ok('busy 被复位成 false（这个 P0 的核心）', ST.busy === false, 'busy=' + ST.busy);
+
+    ST.busy = true;
+    let got = null;
+    G.guardRefresh(function (info) { got = info; })({ project: 'x' });
+    ok('回调正常时参数照传、busy 不动（不误伤成功路径）',
+       !!got && got.project === 'x' && ST.busy === true);
+  }
+}
+
+/* ---------------- [13] GB 数值必须按 GB 显示（1.6.6） ----------------
+ * 用户报的：小窗「还能写」显示 142B，而缓存盘实际还有 142 GB。
+ * 这里不是比对字符串有没有改，而是把 fmtBytes / miBytes / miGB 抠出来**真跑一遍**：
+ * 同一台机器上的 142 GB，旧写法给「142B」、新写法给「142GB」—— 能观察到差别，才算钉住。 */
+console.log('\n[13] GB 数值必须按 GB 显示');
+{
+  const parts = ['fmtBytes', 'miBytes', 'miGB']
+    .map(n => extractFn(mainJs, 'function ' + n + '('));
+  if (parts.some(x => !x)) {
+    ok('能抠出 fmtBytes / miBytes / miGB', false, 'main.js 里缺其中之一');
+    ok('miGB(142) 显示成 142GB', false, '--');
+  } else {
+    const factory = new Function('GB',
+      parts.join('\n') + '\nreturn { fmtBytes: fmtBytes, miBytes: miBytes, miGB: miGB };');
+    const F = factory(1073741824);
+    ok('能抠出 fmtBytes / miBytes / miGB', typeof F.miGB === 'function');
+    ok('miGB(142) === "142GB"（用户报的那一格）', F.miGB(142) === '142GB', '得到 ' + F.miGB(142));
+    ok('miBytes(142) === "142B"（旧写法就是这个 —— 反向证明这组测试看得出差别）',
+       F.miBytes(142) === '142B', '得到 ' + F.miBytes(142));
+    ok('miGB 内部确实 ×GB（等价于 miBytes(142 * GB)）',
+       F.miGB(142) === F.miBytes(142 * 1073741824));
+    ok('小数也走 GB：miGB(0.5) === "512MB"', F.miGB(0.5) === '512MB', '得到 ' + F.miGB(0.5));
+    ok('非数字给 "--"（不显示 NaN）', F.miGB(NaN) === '--' && F.miGB(undefined) === '--');
+    ok('字节字段不受影响：miBytes(142 * GB) 仍是 "142GB"',
+       F.miBytes(142 * 1073741824) === '142GB' && F.miBytes(512) === '512B');
+  }
 }
 
 console.log(`\n===== ${pass} 通过, ${fail} 失败 =====`);

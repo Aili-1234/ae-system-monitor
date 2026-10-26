@@ -681,6 +681,20 @@
     }
 
     renderMini();
+    renderMiniStats();
+  }
+
+  /* 环形进度（1.7.0）：原先是 conic-gradient 背景（Chromium 69+），现在画在
+     内联 SVG 上 —— r=15.9155 整圆周长 100，进度就是 stroke-dashoffset 100-p。
+     颜色仍然走 --rc（CSS 里 .arc-fg 的 stroke 读它），这里只在需要时覆盖。 */
+  function setArc(ringId, pct, col) {
+    var ring = $(ringId);
+    if (!ring || !ring.querySelector) return;
+    var fg = ring.querySelector('.arc-fg');
+    if (!fg) return;
+    var v = isFinite(pct) ? clamp(pct, 0, 100) : 0;
+    fg.style.strokeDashoffset = (100 - v).toFixed(2);
+    fg.style.stroke = col || '';
   }
 
   /* ---------------- 渲染：内存 ---------------- */
@@ -692,6 +706,7 @@
       $('ramUsed').textContent = '-- / --';
       $('ramFree').textContent = '空闲 --';
       ring.style.setProperty('--p', 0);
+      setArc('ramRing', 0, '');
       return;
     }
 
@@ -702,6 +717,7 @@
     $('ramPct').style.color = col;
     ring.style.setProperty('--p', p.toFixed(1));
     ring.style.setProperty('--rc', col);
+    setArc('ramRing', p, col);
 
     $('ramUsed').textContent = fmtBytes(m.used) + ' / ' + fmtBytes(m.total);
     $('ramFree').textContent = '空闲 ' + fmtBytes(m.free);
@@ -713,40 +729,323 @@
     if (fe) fe.textContent = fmtBytes(m.free);
 
     renderMini();
+    renderMiniStats();
+  }
+
+  /* ---------------- 小窗指标表（1.6.5） ----------------
+   * 可选指标的清单只有一处 —— settings.js 的 MINI_MAIN / MINI_SUB / MINI_LABELS，
+   * 这里只补三件事：怎么取值、什么时候变色、配哪个图标。
+   * 图标是手绘内联 SVG（10×10 viewBox、1px 描边、不填充）—— 面板可能跑在没有网的机器上，
+   * 也刻意不引图标字体：多一个外部依赖就多一种「这里怎么空白了」的可能。
+   */
+  var MI_ICONS = {
+    cache: '<ellipse cx="5" cy="2.7" rx="3.6" ry="1.5"/><path d="M1.4 2.7v4.6c0 .9 1.6 1.6 3.6 1.6s3.6-.7 3.6-1.6V2.7"/><path d="M1.4 5c0 .9 1.6 1.6 3.6 1.6S8.6 5.9 8.6 5"/>',
+    mem:   '<rect x="2.4" y="2.4" width="5.2" height="5.2" rx="1"/><path d="M4 2.4V1M6 2.4V1M4 9V7.6M6 9V7.6M2.4 4H1M2.4 6H1M9 4H7.6M9 6H7.6"/>',
+    need:  '<path d="M1.4 8.4h7.2"/><path d="M5 7V2"/><path d="M3.2 3.8 5 2l1.8 1.8"/>',
+    disk:  '<circle cx="5" cy="5" r="3.5"/><circle cx="5" cy="5" r="1.1"/>',
+    left:  '<rect x="1" y="3" width="6.2" height="4.4" rx="1"/><path d="M8.5 4.6v1.6"/><path d="M2.6 4.4h2.2v2.6H2.6z"/>',
+    rate:  '<path d="M1.4 7.8 3.8 5.2l1.9 1.7 2.8-3.7"/><path d="M6.3 3.2h2.2v2.2"/>',
+    eta:   '<circle cx="5" cy="5" r="3.5"/><path d="M5 3v2.2l1.7 1.1"/>'
+  };
+
+  // Settings 万一没加载出来，也要显示得出中文而不是裸的键名
+  var MI_LABELS = {
+    cache_pct: '缓存已用', cache_gb: '缓存已用', mem_free_pct: '内存可用', mem_free_gb: '内存可用',
+    need_pct: '上限占盘比', need_gb: '缓存上限', left_gb: '配额还剩', disk_free_pct: '磁盘可用',
+    disk_free_gb: '磁盘可用', enough: '盘够装吗', rate: '缓存增速', eta: '多久写满', none: '不显示'
+  };
+
+  // cache_pct / cache_gb 落到同一个圆柱图标
+  function miIconKey(key) { return String(key || '').replace(/_(pct|gb)$/, ''); }
+  function miIcon(key) { return MI_ICONS[miIconKey(key)] || ''; }
+
+  function miLabel(key) {
+    var L = (Settings && Settings.MINI_LABELS) || {};
+    return L[key] || MI_LABELS[key] || key;
+  }
+
+  function miBytes(n) {
+    if (!isFinite(n)) return '--';
+    // 两格各约 33px：带空格的「12.4 GB」会被截断，所以空格去掉；
+    // 「142.0GB」的小数点尾巴也去掉 —— 整数值省两位，142GB 比 142.0GB 好读
+    return fmtBytes(n).replace(/\s+/g, '').replace(/\.0([A-Z]+)$/, '$1');
+  }
+
+  // leftGB / needGB / driveFreeGB 是「GB 数值」而不是字节 —— 直接塞给按字节缩放的 miBytes，
+  // 142 GB 会显示成「142B」（1.6.5 用户当场看出来的就是这个）。要显示这几个字段就走 miGB。
+  function miGB(n) {
+    if (!isFinite(n)) return '--';
+    return miBytes(n * GB);
+  }
+
+  // need = 上限 + 缓冲；除以缓存盘余量 —— 超过 100% 意味着 AE 根本写不满缓存
+  function miNeedPct() {
+    var c = ST.cache;
+    return (c && isFinite(c.needGB) && isFinite(c.driveFreeGB) && c.driveFreeGB > 0)
+      ? c.needGB / c.driveFreeGB * 100 : NaN;
+  }
+  function miDiskFreePct() {
+    var c = ST.cache;
+    return (c && isFinite(c.driveFreeGB) && isFinite(c.driveTotalGB) && c.driveTotalGB > 0)
+      ? c.driveFreeGB / c.driveTotalGB * 100 : NaN;
+  }
+
+  /* 变色方向有两种：缓存占用是「越高越糟」，余量类是「越低越糟」。
+     同一对阈值 + 一个 high 开关就够，免得每个指标各写一段 if。 */
+  function miLevel(info, p) {
+    if (!info || !isFinite(p)) return '';
+    if (info.high) {
+      if (p >= info.bad) return 'bad';
+      return p >= info.warn ? 'warn' : '';
+    }
+    if (p <= info.bad) return 'bad';
+    return p <= info.warn ? 'warn' : '';
+  }
+  function miColor(info, p) {
+    var l = miLevel(info, p);
+    return l === 'bad' ? 'var(--bad)' : l === 'warn' ? 'var(--warn)' : '';
+  }
+  // trend 给的是 'bad' / 'warn' / 'flat' / 'up'
+  function miTrendLevel(d) {
+    var l = d && d.level;
+    return l === 'bad' ? 'bad' : l === 'warn' ? 'warn' : '';
+  }
+
+  var MI_MAIN_INFO = {
+    cache_pct: {
+      icon: 'cache', warn: 85, bad: 97, high: true,
+      pct: function () { return ST.cache.quotaGB ? ST.cache.fillPct : NaN; },
+      note: function () { return ST.cache.quotaGB ? fmtBytes(ST.cache.used) + ' / ' + fmtGB(ST.cache.quotaGB) : ''; }
+    },
+    mem_free_pct: {
+      icon: 'mem', warn: 15, bad: 7, high: false,
+      pct: function () { return (ST.mem && isFinite(ST.mem.pct)) ? 100 - ST.mem.pct : NaN; },
+      note: function () { return (ST.mem && isFinite(ST.mem.free)) ? miBytes(ST.mem.free) + ' 可用' : ''; }
+    },
+    /* 主显示里的这一项算的是「上限 + 安全缓冲 占缓存盘剩余空间的比例」。
+       名字写成「上限占盘比」而不是「AE 所需」—— 用户把它读成「AE 现在要这么多」。 */
+    need_pct: {
+      icon: 'need', warn: 80, bad: 100, high: true,
+      pct: function () { return miNeedPct(); },
+      note: function () { return isFinite(ST.cache.needGB) ? '上限+缓冲 ' + miGB(ST.cache.needGB) + ' / 盘余 ' + miGB(ST.cache.driveFreeGB) : ''; }
+    },
+    disk_free_pct: {
+      icon: 'disk', warn: 10, bad: 5, high: false,
+      pct: function () { return miDiskFreePct(); },
+      note: function () { return isFinite(ST.cache.driveFreeGB) ? miGB(ST.cache.driveFreeGB) + ' 可用' : ''; }
+    }
+  };
+
+  /* 次显示两格能放的指标。pct() 只用来取色，val() 才是显示的文字。 */
+  var MI_SUB_INFO = {
+    cache_gb: {
+      icon: 'cache', warn: 85, bad: 97, high: true,
+      pct: function () { return ST.cache.quotaGB ? ST.cache.fillPct : NaN; },
+      val: function () { return (ST.cache && ST.cache.used) ? miBytes(ST.cache.used) : '--'; }
+    },
+    mem_free_gb: {
+      icon: 'mem', warn: 15, bad: 7, high: false,
+      pct: function () { return (ST.mem && isFinite(ST.mem.pct)) ? 100 - ST.mem.pct : NaN; },
+      val: function () { return (ST.mem && isFinite(ST.mem.free)) ? miBytes(ST.mem.free) : '--'; }
+    },
+    /* 「缓存上限」= AE 允许用的最大缓存（quotaGB），不是已经用掉多少。
+       lvl() 返回空串：上限是个常量，没有「好/坏」可言，不该上色
+       （不给它 lvl 的话会被当成增速指标，走 miTrendLevel 上色）。 */
+    need_gb: {
+      icon: 'need',
+      lvl: function () { return ''; },
+      val: function () { return ST.cache.quotaGB ? miGB(ST.cache.quotaGB) : '--'; }
+    },
+    /* 「盘够装吗」：拿面板既有的三条线（ST.cache.verdict）翻成人话，
+       不新增阈值，也就不存在「小窗说够、面板说紧」这种自相矛盾。 */
+    enough: {
+      icon: 'need',
+      lvl: function () {
+        var v = ST.cache && ST.cache.verdict;
+        return v === 'bad' ? 'bad' : (v === 'warn' ? 'warn' : '');
+      },
+      val: function () {
+        var v = ST.cache && ST.cache.verdict;
+        if (v === 'ok') return '够';
+        if (v === 'warn') return '偏紧';
+        if (v === 'bad') return '不够';
+        return '--';                     // 没读到缓存盘 → 判定不出来就说不知道
+      }
+    },
+    left_gb: {
+      icon: 'left', warn: 85, bad: 97, high: true,
+      pct: function () { return ST.cache.quotaGB ? ST.cache.fillPct : NaN; },
+      val: function () { return ST.cache.quotaGB ? miGB(ST.cache.leftGB) : '--'; }
+    },
+    disk_free_gb: {
+      icon: 'disk', warn: 10, bad: 5, high: false,
+      pct: function () { return miDiskFreePct(); },
+      val: function () { return isFinite(ST.cache.driveFreeGB) ? miGB(ST.cache.driveFreeGB) : '--'; }
+    },
+    rate: {
+      icon: 'rate',
+      val: function (d) { return miRateText(d); }
+    },
+    eta: {
+      icon: 'eta',
+      val: function (d) { return miEtaText(d); }
+    }
+  };
+
+  function miRateNum(v) {
+    if (!isFinite(v)) return '--';
+    return v >= 1 ? v.toFixed(1) + 'GB/h' : Math.max(1, Math.round(v * 1024)) + 'MB/h';
+  }
+  function miRateText(d) {
+    var r = d && d.rate;
+    if (!r || !r.ok || r.points < 2) return '--';
+    if (r.dir === 'down') return '↓' + miRateNum(r.perHour);
+    if (r.dir === 'flat') return '持平';
+    return '↑' + miRateNum(r.perHour);
+  }
+  function miEtaText(d) {
+    var h = d && d.etaHours;
+    if (h === null || h === undefined || !isFinite(h)) return '--';
+    if (h <= 0) return '已耗尽';
+    return h < 48 ? Math.round(h) + 'h' : (h / 24).toFixed(1) + '天';
+  }
+
+  /* 三个下拉的选项由 MINI_MAIN / MINI_SUB 生成 —— 清单只有一处，
+     不会出现「设置里能选、小窗不认」的错位；单位跟在名字后面，看得见选的是 % 还是 GB。 */
+  function buildMiniOptions() {
+    var SS = Settings || {};
+    var mainList = SS.MINI_MAIN || ['cache_pct'];
+    var subList = SS.MINI_SUB || ['none'];
+    var L = SS.MINI_LABELS || {};
+    var U = SS.MINI_UNITS || {};
+    function fill(sel, values) {
+      if (!sel) return;
+      sel.innerHTML = '';
+      for (var i = 0; i < values.length; i++) {
+        var o = document.createElement('option');
+        o.value = values[i];
+        o.textContent = (L[values[i]] || values[i]) + (U[values[i]] ? '（' + U[values[i]] + '）' : '');
+        sel.appendChild(o);
+      }
+    }
+    fill($('selMetric'), mainList);
+    fill($('selSub1'), subList);
+    fill($('selSub2'), subList);
+  }
+
+  /* 主显示与次显示指同一个指标时把次显示留空，并说明原因。
+     判定本身是 settings.js 的 fixMini（纯函数、单测覆盖），这里只把结果写回界面。 */
+  function pruneMiniSelects() {
+    var mSel = $('selMetric'), s1 = $('selSub1'), s2 = $('selSub2');
+    if (!mSel || !Settings || !Settings.fixMini) return null;
+    var before1 = s1 ? s1.value : 'none';
+    var before2 = s2 ? s2.value : 'none';
+    var fixed = Settings.fixMini({ miniMetric: mSel.value, miniSub1: before1, miniSub2: before2 });
+    if (s1) s1.value = fixed.miniSub1;
+    if (s2) s2.value = fixed.miniSub2;
+    var hint = $('miniHint');
+    if (hint) {
+      hint.textContent = (fixed.miniSub1 !== before1 || fixed.miniSub2 !== before2)
+        ? '与主显示重复的那一格已留空 —— 同一个指标不显示两遍。'
+        : '主显示画环；次显示 1 / 2 是环下面两格，同一指标会自动留空。「盘够装吗」看的是缓存盘装不装得下 AE 的缓存上限（含安全缓冲），够 / 偏紧 / 不够。';
+    }
+    return fixed;
+  }
+
+  /* 选完立刻生效：这三个下拉就摆在小窗旁边，改完还要去抽屉底下按「确定」，
+     等于让用户猜自己改的到底生效没有。 */
+  function applyMiniChoice() {
+    if (!USR || !Settings) return;
+    var fixed = pruneMiniSelects();
+    USR = Settings.normalize({
+      autoCollapse: USR.autoCollapse,
+      miniMetric: fixed ? fixed.miniMetric : USR.miniMetric,
+      miniSub1: fixed ? fixed.miniSub1 : USR.miniSub1,
+      miniSub2: fixed ? fixed.miniSub2 : USR.miniSub2,
+      uiDefault: USR.uiDefault,
+      quotaGB: USR.quotaGB || 0,
+      ui: USR.ui,
+      crashGuard: USR.crashGuard,
+      reminders: USR.reminders
+    });
+    saveCfg();
+    renderMini();
+    renderMiniStats();
+  }
+
+  /* 图标只在键变了才重写 DOM：小窗每 3 秒刷一次，反复写 innerHTML 会打断渲染，
+     窄面板上还能看见图标闪一下。 */
+  function miSetIcon(el, key) {
+    if (!el) return;
+    var d = miIcon(key);
+    if (el.getAttribute('data-mi') === d) return;
+    el.setAttribute('data-mi', d);
+    el.innerHTML = d;
   }
 
   /* ---------------- 折叠小窗 ---------------- */
-  // 小窗只回答一件事：当前那个百分比是多少。
-  // 指标可在设置里切成「缓存填充率」或「内存占用」。
+  // 小窗的环只回答一件事：当前那个百分比是多少。
+  // 是哪个百分比由设置决定（1.6.5 起四个可选，见 MI_MAIN_INFO）。
   function renderMini() {
     var pctEl = $('miniPct'), labEl = $('miniLabel'), ring = $('miniRing');
     if (!pctEl || !ring) return;
 
-    var metric = (USR && USR.miniMetric) || 'cache';
-    var p = 0, label = '缓存', col = '';
-
-    if (metric === 'mem') {
-      label = '内存';
-      p = ST.mem ? ST.mem.pct : NaN;
-      col = isFinite(p) ? (colorBy(p, CFG.ramWarn, CFG.ramBad) || '') : '';
-    } else {
-      label = '缓存';
-      p = ST.cache.fillPct;
-      col = isFinite(p) && ST.cache.quotaGB ? (colorBy(p, 85, 97) || '') : '';
-    }
-
+    var key = (USR && USR.miniMetric) || 'cache_pct';
+    var info = MI_MAIN_INFO[key] || MI_MAIN_INFO.cache_pct;
+    var p = info.pct();
     var ok = isFinite(p);
+
     pctEl.textContent = ok ? Math.round(p) + '%' : '--';
-    labEl.textContent = label;
+    if (labEl) labEl.textContent = miLabel(key);
+    miSetIcon($('miMain'), info.icon);
     ring.style.setProperty('--p', (ok ? clamp(p, 0, 100) : 0).toFixed(1));
+    var col = miColor(info, p);
     if (col) ring.style.setProperty('--rc', col);
     else ring.style.removeProperty('--rc');
+    setArc('miniRing', ok ? p : 0, col);
 
-    ring.title = label + ' ' + (ok ? Math.round(p) + '%' : '--') +
-                 (metric === 'cache' && ST.cache.quotaGB
-                   ? '（' + fmtBytes(ST.cache.used) + ' / ' + fmtGB(ST.cache.quotaGB) + '）'
-                   : '') +
+    var note = info.note ? info.note() : '';
+    ring.title = miLabel(key) + ' ' + (ok ? Math.round(p) + '%' : '--') +
+                 (note ? '（' + note + '）' : '') +
                  '　点击展开';
+  }
+
+  /* 小窗下方的占用行（1.6.2）：内存 / 缓存 各一行，超线才变色。
+   * 只给数字不给百分比：环里已经有百分比了，下面再来一遍是重复。
+   *
+   * 为什么独立于 renderMini：这两行显示的是**数值**（内存/缓存的绝对用量），
+   * 而 renderMini 画的是**环**。数值该跟数值的节拍走 —— renderCache / renderMem 一更新就该刷。
+   * 早先挂在 renderMini 末尾，等于「环不重画，数字就不更新」：一旦哪天有人改了环的刷新条件
+   * （比如只在百分比变化时才重绘），这两行会静静停在旧值上。耦合关系错了，不是当下可见的 bug。 */
+  function renderMiniStats() {
+    var d = (Trend && ST.cache) ? Trend.describe(ST.cacheHist, ST.cache.marginGB) : null;
+    var cells = [
+      { key: (USR && USR.miniSub1) || 'none', box: $('ms1'), ico: $('mi1'), lab: $('ml1'), val: $('mv1') },
+      { key: (USR && USR.miniSub2) || 'none', box: $('ms2'), ico: $('mi2'), lab: $('ml2'), val: $('mv2') }
+    ];
+    var shown = 0;
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      var info = MI_SUB_INFO[cell.key];
+      if (!info) {                    // none / 值不合法：整格收起来，不占位置
+        if (cell.box) cell.box.hidden = true;
+        continue;
+      }
+      shown++;
+      if (cell.box) cell.box.hidden = false;
+      miSetIcon(cell.ico, info.icon);
+      if (cell.lab) cell.lab.textContent = miLabel(cell.key);
+      if (cell.val) cell.val.textContent = info.val(d);
+      // 三路：词语指标自带 lvl()（如「盘够装吗」）；有 pct() 的按阈值上色；
+      // 剩下的（增速 / 距耗尽）按趋势上色。
+      var lvl = info.lvl ? info.lvl(d) : (info.pct ? miLevel(info, info.pct()) : miTrendLevel(d));
+      if (cell.box && cell.box.classList) {
+        cell.box.classList.toggle('on', lvl === 'warn');
+        cell.box.classList.toggle('bad', lvl === 'bad');
+      }
+    }
+    var row = $('miniStats');
+    if (row) row.hidden = (shown === 0);   // 两格都没选时整行不占位置
   }
 
   function setCompact(on, silent) {
@@ -754,6 +1053,13 @@
     document.body.classList.toggle('compact', compact);
     if (!compact) autoCollapsed = false;
     renderMini();
+    // 折叠/展开会改变提醒条能放下的文字量：正在显示的提醒要跟着换文案，
+    // 否则小窗里继续显示长句、展开后还停在短句，直到 25 秒后换下一条。
+    if (rmCur) {
+      rmMsgExpanded = false;
+      $('rmMsg').classList.remove('expanded');
+      $('rmMsg').textContent = compact && rmCur.shortMsg ? rmCur.shortMsg : (rmCur.msg || '');
+    }
     if (!silent) toast(compact ? '已折叠' : '已展开');
   }
 
@@ -1144,17 +1450,47 @@
    * 1.6.1 起写进可见的中文名；旧目录仍可读（legacyBackupDirFor），只是不再往里写。 */
   var BACKUP_DIR_NAME = 'AE-System-Monitor 备份';
   var BACKUP_DIR_OLD = '.ae-system-monitor-backups';
+  // 面板里只摊开最近 N 份（用户指定的 3 份）：96–280px 宽的面板把全部列出来既挤也没意义
+  var BK_LIST_N = 3;
+  var bkListOpen = false;
 
-  function backupRoot(projectPath) {
-    // 优先放在工程所在卷，避免大工程备份挤满系统盘；路径不可用时回退到本机目录。
-    if (projectPath && hasNode && pathmod) {
-      try {
-        var parent = pathmod.dirname(projectPath);
-        if (fs.existsSync(parent)) return pathmod.join(parent, BACKUP_DIR_NAME);
-      } catch (e) {}
-    }
+  /* 用户填的自定义落点（设置 › 崩溃保护 › 副本目录）。空串 = 用默认位置。 */
+  function customBackupDir() {
+    var c = (USR && USR.crashGuard && USR.crashGuard.backupDir) || '';
+    return typeof c === 'string' ? c.trim() : '';
+  }
+
+  /* 自定义落点还能不能用：存在，或者能建出来。
+     拔掉的盘符 existsSync 为 false、mkdir 会抛 —— 两种都算不可用，
+     由 pickRoot 退回默认位置（面板会显示「自定义目录不可用」）。 */
+  function canUseDir(dir) {
+    if (!dir || !hasNode || !fs) return false;
+    try {
+      if (fs.existsSync(dir)) return true;
+      mkdirp(dir);
+      return fs.existsSync(dir);
+    } catch (e) { return false; }
+  }
+
+  /* 默认落点：优先工程所在卷（避免大工程备份挤满系统盘），路径不可用时退回本机目录。
+     1.6.4 起它有两个身份：用户没填自定义目录时它就是落点本身；
+     用户填了之后它退居「只读的旧落点」—— 老副本仍要看得见、取得到（见 listBackups）。 */
+  function defaultBackupDirFor(projectPath) {
+    if (!projectPath || !hasNode || !pathmod) return '';
+    try {
+      var parent = pathmod.dirname(projectPath);
+      if (fs.existsSync(parent)) return pathmod.join(parent, BACKUP_DIR_NAME);
+    } catch (e) {}
     var dir = localDataDir();
     return dir ? pathmod.join(dir, 'backup') : '';
+  }
+
+  function backupRoot(projectPath) {
+    var pick = (Backup && pathmod) ? Backup.pickRoot(customBackupDir(), '', canUseDir) : null;
+    ST.bkCustom = !!(pick && pick.custom);
+    ST.bkFallback = !!(pick && pick.fellback);
+    if (pick && pick.root) return pathmod.join(pick.root, BACKUP_DIR_NAME);
+    return defaultBackupDirFor(projectPath);
   }
 
   function backupDirFor(projectPath) {
@@ -1192,7 +1528,7 @@
    * 0 字节的残档不参与「最新一份」，否则取回会挑中一个打不开的文件。 */
   function listBackups(projectPath) {
     var out = [];
-    function scan(dir, isOld) {
+    function scan(dir, note) {
       if (!dir || !fs || !fs.existsSync(dir)) return;
       try {
         fs.readdirSync(dir).forEach(function (n) {
@@ -1201,12 +1537,17 @@
           var st = null;
           try { st = fs.statSync(p); } catch (e) { return; }
           if (!st.size) return;
-          out.push({ name: n, path: p, size: st.size, mtime: st.mtimeMs, old: !!isOld });
+          out.push({ name: n, path: p, size: st.size, mtime: st.mtimeMs,
+                     old: !!note, note: note || '' });
         });
       } catch (e) {}
     }
-    scan(backupDirFor(projectPath), false);
-    scan(legacyBackupDirFor(projectPath), true);
+    scan(backupDirFor(projectPath), '');
+    scan(legacyBackupDirFor(projectPath), '旧位置');
+    /* 用户把落点改到别的盘之后，**原先默认位置里的那些副本不能就此看不见** ——
+       那正是「我的副本没了」的由来。只读扫一遍、标注来源，取回照旧可用。 */
+    var defDir = defaultBackupDirFor(projectPath);
+    if (defDir && defDir !== backupDirFor(projectPath)) scan(defDir, '默认位置');
     out.sort(function (a, b) { return a.name < b.name ? 1 : -1; });
     return out;
   }
@@ -1241,15 +1582,14 @@
     }
   }
 
-  /* 取回最近一份：生成「（回退 时间）」副本，不动原文件 */
-  function restoreLatest() {
+  /* 取回指定的那一份：生成「（回退 时间）」副本，不动原文件。
+   * 1.6.2 起面板可逐份取回，所以把这一步从「取最近一份」里拆出来；
+   * 两种入口都走这里，取回本身必须原子写 —— 否则大工程写到一半失败
+   * 会留下一个「看着能用」的半截副本。 */
+  function restorePick(pick) {
     if (!Backup || !hasNode || !ST.projectPath) { toast('先打开一个已保存的工程'); return; }
-    var list = listBackups(ST.projectPath);
-    if (!list.length) { toast('还没有回退副本（下次保护保存时生成）'); return; }
+    if (!pick) { toast('这一份已经不在了，已刷新列表'); return; }
 
-    // list[0] 已经过滤掉 0 字节与 .part；取回本身也走原子写，
-    // 否则大工程写到一半失败会留下一个「看着能用」的半截副本。
-    var pick = list[0];
     var dir = pathmod.dirname(ST.projectPath);
     var taken = [];
     try {
@@ -1259,8 +1599,16 @@
     var dest = pathmod.join(dir, Backup.uniqueName(Backup.restoreName(ST.projectPath, pick.mtime), taken));
     var w = Backup.atomicCopy(fs, pathmod, pick.path, dest);
     if (!w.ok) { toast('取回失败：' + w.err); return; }
-    toast('已生成回退副本：' + pathmod.basename(dest) + (pick.old ? '（来自旧备份目录）' : ''));
+    toast('已生成回退副本：' + pathmod.basename(dest) + (pick.note ? '（来自' + pick.note + '）' : ''));
     openFolder(dir);
+  }
+
+  /* 取回最近一份（list[0] 已过滤掉 0 字节与 .part，就是最新的可用副本） */
+  function restoreLatest() {
+    if (!Backup || !hasNode || !ST.projectPath) { toast('先打开一个已保存的工程'); return; }
+    var list = listBackups(ST.projectPath);
+    if (!list.length) { toast('还没有回退副本（下次保护保存时生成）'); return; }
+    restorePick(list[0]);
   }
 
   function pad2(n) { return n < 10 ? '0' + n : '' + n; }
@@ -1269,6 +1617,15 @@
     var d = new Date(ms);
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
            ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  }
+
+  /* 列表里用的短时间：今天只给「时:分」，别的日子才补月-日 —— 窄面板省宽度 */
+  function stampShort(ms) {
+    var d = new Date(ms), n = new Date();
+    var hm = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    if (d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() &&
+        d.getDate() === n.getDate()) return hm;
+    return pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + hm;
   }
 
   function whyText(why) {
@@ -1425,17 +1782,36 @@
     renderBackup();
   }
 
-  /* 回退副本：只报「有几份、最近一次」，不摊开列表 —— 列表在文件夹里看更实在 */
+  /* 回退副本：报「有几份、最近一次」，并可摊开最近 3 份逐份取回（1.6.2） */
   function renderBackup() {
     var el = $('bkHint');
     if (!el) return;
 
     var bo = $('btnBkOpen'), br = $('btnBkRestore');
 
+    /* 先把列表收掉，再走各条分支（1.6.2 修缮）。
+     *
+     * 收起列表这件事，早先只挂在**成功路径**末尾的 renderBackupList 里
+     * （那里才写 box.hidden = !bkListOpen）。而下面三条提前返回都不经过它：
+     * 于是「用户点开列表 → 关掉备份功能 / 工程路径失效」时，提示文字换成了
+     * 「回退副本已关闭」，**下面那份列表却原样挂着**，行里的 ↺ 还点得动 ——
+     * 界面在说「没这东西」，手上却在给入口。
+     * 把它提到最前面，比在每条 return 前补一句可靠：以后再加分支也不会漏。 */
+    if (bkListOpen) {
+      bkListOpen = false;
+      var early = $('bkList');
+      if (early) {
+        early.hidden = true;
+        if (early.innerHTML !== '') early.innerHTML = '';
+      }
+    }
+
     if (!Backup || !hasNode) {
       el.textContent = '回退副本：需要 Node 环境';
       if (bo) bo.hidden = true;
       if (br) br.hidden = true;
+      if (el.classList) el.classList.remove('clickable');
+      el.title = '';
       return;
     }
     if (bo) bo.hidden = false;
@@ -1444,34 +1820,141 @@
     if (!backupEnabled()) {
       el.textContent = '回退副本已关闭（设置里可开）';
       if (br) br.hidden = true;
+      if (el.classList) el.classList.remove('clickable');
+      el.title = '';
+      // btnBkOpen（↗ 打开备份文件夹）**故意不收**：它与备份开关是解耦的 ——
+      // 关掉备份功能不等于用户不想翻已经存下的那些副本，那个按钮的 handler
+      // 在无工程时会回退到 backupRoot() 开根目录，点了不会崩。
+      // 写在这里是为了让下一个审计者别再把它当漏掉的 hidden 报上来。
       return;
     }
     if (!ST.projectPath) {
       el.textContent = '回退副本：打开一个已保存的工程后可用';
       if (br) br.hidden = true;
+      if (el.classList) el.classList.remove('clickable');
       el.title = '';
       return;
     }
 
     var list = listBackups(ST.projectPath);
     var dir = backupDirFor(ST.projectPath) || '';
-    var oldN = list.filter(function (b) { return b.old; }).length;
+    var noteN = {};
+    list.forEach(function (b) { if (b.note) noteN[b.note] = (noteN[b.note] || 0) + 1; });
+    var oldN = (noteN['旧位置'] || 0) + (noteN['默认位置'] || 0);
+    if (ST.bkFallback) bkDirWarn();      // 自定义落点用不上时，出声一次（不静默退回）
+    // 命中次数由 BK_LIST_N 收口：面板只摊最近 3 份，全部仍在文件夹里可看
 
     // 目录固定写进 title：这一行本来就是「副本在哪」，不该只在「暂无」时才给路径。
     var tail = dir ? '\n\n目录：' + dir : '';
-    if (oldN) tail += '\n旧位置（1.6.0 及以前）还有 ' + oldN + ' 份，可直接取回，不再往里写';
+    if (ST.bkCustom) tail += '\n\n落点：自定义目录（设置 › 崩溃保护 › 副本目录）';
+    if (noteN['旧位置']) {
+      tail += '\n旧位置（1.6.0 及以前）还有 ' + noteN['旧位置'] + ' 份，可直接取回，不再往里写';
+    }
+    if (noteN['默认位置']) {
+      tail += '\n默认位置还有 ' + noteN['默认位置'] + ' 份（落点已改到别处），可直接取回，不再往里写';
+    }
+    if (ST.bkFallback) {
+      tail += '\n\n自定义目录不可用：' + customBackupDir() + '\n已退回默认位置，这次保护保存的副本在默认位置';
+    }
 
     if (!list.length) {
       el.textContent = '回退副本：暂无（下次保护保存时生成）';
       el.title = (dir || '') + tail;
-    } else {
-      el.textContent = '回退副本 ' + list.length + ' 份 · 最近 ' + agoText(list[0].mtime) +
-        (oldN ? ' · 旧位置 ' + oldN + ' 份' : '');
-      el.title = list.slice(0, 8).map(function (b) {
-        return stamp(b.mtime) + '　' + fmtBytes(b.size) + (b.old ? '（旧位置）' : '');
-      }).join('\n') + tail;
+      if (el.classList) el.classList.remove('clickable');
+      renderBackupList(list);   // 空列表会收起并清空 box，不再挂着上一次的行
+      if (ST.guard.backupErr) el.textContent += ' · 上次备份失败：' + ST.guard.backupErr;
+      return;
     }
+    el.textContent = '回退副本 ' + list.length + ' 份 · 最近 ' + agoText(list[0].mtime) +
+      (oldN ? ' · 另位置 ' + oldN + ' 份' : '') +
+      (ST.bkFallback ? ' · 自定义目录不可用' : '') + (bkListOpen ? ' ▴' : ' ▾');
+    el.title = '点击这一行展开最近 ' + BK_LIST_N + ' 份，逐份取回\n' +
+      list.slice(0, 8).map(function (b) {
+        return stamp(b.mtime) + '　' + fmtBytes(b.size) + (b.note ? '（' + b.note + '）' : '');
+      }).join('\n') + tail;
+    if (el.classList) el.classList.toggle('clickable', list.length > 0);
+    renderBackupList(list);
     if (ST.guard.backupErr) el.textContent += ' · 上次备份失败：' + ST.guard.backupErr;
+  }
+
+  /* 最近 N 份副本的列表：一行一份（时间 / 大小 / 取回）。
+   * 内容在这里生成而不写死在 html 里：它随工程与文件系统变化。
+   *
+   * 按钮上带的是**这一份的绝对路径**，不是下标 —— 列表行是渲染那一刻的快照，
+   * 而点击发生在之后：这中间文件系统会变（新的保护保存落进一份、轮转删掉旧的、
+   * 用户在 AE 里另存了工程）。若按钮只带下标，点击时再拿它去查一遍**新**列表，
+   * 就会取到另一份（甚至 undefined）—— 用户点的是 14:32 那份，拿回的却是别的。
+   * 路径是这份副本自己的身份，跟列表顺序无关，重读多少次都指向同一份。 */
+  function renderBackupList(list) {
+    var box = $('bkList');
+    if (!box) return;
+    var top = Backup ? Backup.recent(list, BK_LIST_N) : (list || []).slice(0, BK_LIST_N);
+    if (!top.length) {
+      if (box.innerHTML !== '') box.innerHTML = '';
+      box.hidden = true;
+      return;
+    }
+    box.innerHTML = top.map(function (b) {
+      // 路径进 HTML 属性：四类字符必须转义，否则含引号的路径会把属性切断
+      var key = String(b.path == null ? '' : b.path)
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return '<div class="bkl-r">' +
+        '<span class="bkl-t">' + stampShort(b.mtime) + '</span>' +
+        '<span class="bkl-s">' + fmtBytes(b.size) + '</span>' +
+        (b.note ? '<span class="bkl-o">' + b.note + '</span>' : '') +
+        '<button class="ibtn sm" data-bk="' + key + '" title="取回这一份（生成副本，不动原文件）">↺</button>' +
+        '</div>';
+    }).join('');
+    // 150px 以下：时间 + 尺寸 + 按钮三列会挤成一团，尺寸列直接不显示
+    applyWidthClasses();
+    box.hidden = !bkListOpen;
+  }
+
+  /* 窄面板要收的列（1.7.0 抽出来）：原来只在渲染备份列表时算一次，拖动面板
+     变窄不会立刻跟手；现在 resize 节流里也调它。 */
+  function applyWidthClasses() {
+    var box = $('bkList');
+    if (!box || !box.classList) return;
+    var w = (document && document.body) ? document.body.clientWidth : 0;
+    box.classList.toggle('narrow', !!w && w < 150);
+  }
+
+  /* 自定义落点不可用：只出声一次（每次刷新都弹就成了噪音），面板那一行也常驻写着。 */
+  function bkDirWarn() {
+    if (ST.bkFallbackTold) return;
+    ST.bkFallbackTold = true;
+    toast('自定义副本目录不可用，本次已退回默认位置：' + customBackupDir());
+  }
+
+  /* 目录选择：走 CEP 的 showOpenDialog。没有它（浏览器里预览、权限受限）就如实提示手动填，
+     不假装选过 —— 否则用户以为选了，副本还是落在老地方。 */
+  function pickBackupDir() {
+    var el = $('inBkDir');
+    if (!el) return;
+    var chosen = '';
+    try {
+      if (window.cep && window.cep.fs && window.cep.fs.showOpenDialog) {
+        var r = window.cep.fs.showOpenDialog(false, false, '选择回退副本的存放目录', el.value || '');
+        if (r && r.err === 0 && r.data && r.data.length) chosen = r.data[0];
+      }
+    } catch (e) { chosen = ''; }
+    if (!chosen) { toast('这套环境不支持目录选择，请手动填写路径'); return; }
+    el.value = chosen;
+    mergeGuardCfg({ backupDir: chosen });
+    syncBkDirHint();
+    renderBackup();
+    var eff = USR && USR.crashGuard ? USR.crashGuard.backupDir : '';
+    toast(eff === chosen ? '回退副本目录：' + chosen : '这个路径不可用，已退回默认位置');
+  }
+
+  function syncBkDirHint() {
+    var el = $('bkDirHint');
+    if (!el) return;
+    var c = customBackupDir();
+    el.textContent = c ? '当前：' + c + '（下面按工程分文件夹）'
+                       : '默认：工程目录旁的「AE-System-Monitor 备份」';
+    el.title = c ? c : '';
   }
 
   /* 保存日志那一行：最近几次保存 + 日志文件位置（鼠标悬停看全文） */
@@ -1576,7 +2059,7 @@
       ST.projectPath, ST.proj.rq, ST.renderMuted, compact ? 1 : 0,
       ST.autoSave ? (ST.autoSave.enabled ? 1 : 0) : -1,
       ST.lastAutoSaved ? ST.lastAutoSaved.mtime : 0,
-      USR ? USR.miniMetric : ''
+      USR ? (USR.miniMetric + '|' + USR.miniSub1 + '|' + USR.miniSub2) : ''
     ].join('~');
   }
 
@@ -1740,26 +2223,49 @@
     setTimeout(function () { finish(NaN); }, 9000);   // 兜底：别让 busy 卡死
   }
 
+  /* 刷新链上任何一处抛出，都必须复位 ST.busy。
+     否则下面那句 `if (ST.busy) return;` 会让整个刷新循环永久死亡：
+     2026-10-26 在真机 AE + 真 CEP 环境下做注入实验验证过 —— 只要在 Promise.all
+     之前抛一次异常，刷新计数立刻冻结，连点 4 次 ⟳ 加静置 8 秒都不恢复，
+     只有重载面板才能救回来。 */
+  function refreshFail(e) {
+    ST.busy = false;
+    try { if (console && console.error) console.error('[refresh] 异常，已复位 busy：', e); } catch (x) {}
+  }
+
+  /* readAE 的回调体是异步执行的，外面包 try 抓不到它内部抛的异常，
+     所以必须在回调函数本身上套一层。 */
+  function guardRefresh(fn) {
+    return function (info) {
+      try { fn.call(this, info); } catch (e) { refreshFail(e); }
+    };
+  }
+
   function refresh(force) {
     if (ST.busy) return;
     ST.busy = true;
 
-    if (ST.interval > 0) $('liveDot').classList.remove('paused');
+    try {
+      if (ST.interval > 0) $('liveDot').classList.remove('paused');
 
-    // 快速项：先给即时反馈
-    ST.mem = readMem();
-    if (ST.mem) {
-      ST.hist.push(ST.mem.pct);
-      if (ST.hist.length > CFG.histMax) ST.hist.shift();
+      // 快速项：先给即时反馈
+      ST.mem = readMem();
+      if (ST.mem) {
+        ST.hist.push(ST.mem.pct);
+        if (ST.hist.length > CFG.histMax) ST.hist.shift();
+      }
+      updateDisks(force);           // 带 TTL 与失败保留，失败时沿用上次有效读数
+      updateCommit(force);          // 提交内存：AE 分配失败看的是它，不是物理余量
+
+      renderMem();
+      drawSpark();
+      renderDisks();
+    } catch (e) {
+      refreshFail(e);
+      return;                        // 这一段没跑到 readAE，直接收尾，别往下走
     }
-    updateDisks(force);           // 带 TTL 与失败保留，失败时沿用上次有效读数
-    updateCommit(force);          // 提交内存：AE 分配失败看的是它，不是物理余量
 
-    renderMem();
-    drawSpark();
-    renderDisks();
-
-    readAE(function (info) {
+    readAE(guardRefresh(function (info) {
       ST.ae = info;
 
       // 心跳：读不到 AE 的响应，说明主线程已被占死（渲染、或真卡住了）
@@ -1833,7 +2339,7 @@
         renderAll();
         ST.busy = false;
       });
-    });
+    }));
   }
 
   /* 实际生效的间隔。用户选的间隔是上限，下面两种情况下要主动放慢：
@@ -2077,19 +2583,21 @@
     if (rmQueue.length) setTimeout(showNextRemind, 420);
   }
 
-  /* 极简模式下点标题可以来回切换「短消息 / 完整消息」。
-     没有这一步的话，极简模式的用户永远看不到完整提示内容
-     （小窗放不下）。 */
+  /* 点标题在「短消息 / 完整消息」之间切换。
+     小窗默认只显示短消息，没有这一步就永远看不到完整内容；
+     正常模式本来显示完整消息，但矮面板下正文会被限高，点标题同样能取消限高。
+     正常模式不能拿 shortMsg 去替换正文 —— 那会变成「点开完整提示反而变短」。 */
   var rmMsgExpanded = false;
 
   function toggleRemindMsg() {
     if (!rmCur) return;
     var msgEl = $('rmMsg');
     if (!msgEl) return;
-    if (!rmCur.shortMsg || rmCur.shortMsg === rmCur.msg) return;
     rmMsgExpanded = !rmMsgExpanded;
-    msgEl.textContent = rmMsgExpanded ? (rmCur.msg || '') : rmCur.shortMsg;
     msgEl.classList.toggle('expanded', rmMsgExpanded);
+    if (!compact) return;
+    if (!rmCur.shortMsg || rmCur.shortMsg === rmCur.msg) return;
+    msgEl.textContent = rmMsgExpanded ? (rmCur.msg || '') : rmCur.shortMsg;
   }
 
   function reminderTick() {
@@ -2176,6 +2684,8 @@
     USR = Settings.normalize({
       autoCollapse: USR.autoCollapse,
       miniMetric: USR.miniMetric,
+      miniSub1: USR.miniSub1,
+      miniSub2: USR.miniSub2,
       uiDefault: USR.uiDefault,
       quotaGB: USR.quotaGB || 0,
       ui: USR.ui,
@@ -2230,7 +2740,10 @@
   function syncDrawer() {
     if (!USR) return;
     $('cbAuto').checked = !!USR.autoCollapse;
-    $('selMetric').value = USR.miniMetric;
+    if ($('selMetric')) $('selMetric').value = USR.miniMetric;
+    if ($('selSub1')) $('selSub1').value = USR.miniSub1 || 'none';
+    if ($('selSub2')) $('selSub2').value = USR.miniSub2 || 'none';
+    pruneMiniSelects();
     if ($('selUiDefault')) $('selUiDefault').value = USR.uiDefault || 'compact';
     syncRemindSummary();
 
@@ -2255,6 +2768,8 @@
     $('cbSaveLog').checked = !!cg.log;
     $('cbBackup').checked = !!cg.backup;
     $('inKeep').value = cg.keepBackups;
+    if ($('inBkDir')) $('inBkDir').value = cg.backupDir || '';
+    syncBkDirHint();
     syncLogHint();
     syncModeHint();
   }
@@ -2322,13 +2837,15 @@
     var ng = {
       on: g.on, autoSave: g.autoSave, holdMin: g.holdMin, riskSave: g.riskSave,
       cooldownMin: g.cooldownMin, log: g.log, mode: g.mode, detectedAt: g.detectedAt,
-      backup: g.backup, keepBackups: g.keepBackups
+      backup: g.backup, keepBackups: g.keepBackups, backupDir: g.backupDir
     };
     for (var k in patch) { if (patch.hasOwnProperty(k)) ng[k] = patch[k]; }
 
     USR = Settings.normalize({
       autoCollapse: USR.autoCollapse,
       miniMetric: USR.miniMetric,
+      miniSub1: USR.miniSub1,
+      miniSub2: USR.miniSub2,
       uiDefault: USR.uiDefault,
       quotaGB: USR.quotaGB || 0,
       ui: USR.ui,
@@ -2397,7 +2914,9 @@
 
     USR = Settings.normalize({
       autoCollapse: $('cbAuto').checked,
-      miniMetric: $('selMetric').value,
+      miniMetric: $('selMetric') ? $('selMetric').value : USR.miniMetric,
+      miniSub1: $('selSub1') ? $('selSub1').value : USR.miniSub1,
+      miniSub2: $('selSub2') ? $('selSub2').value : USR.miniSub2,
       uiDefault: $('selUiDefault').value,
       quotaGB: USR.quotaGB || 0,          // 上限不在抽屉里改，但要原样带回去，否则会被重置成自动
       ui: USR.ui,                          // 展开状态同理，不能被一次「确定」重置回首屏收起
@@ -2410,6 +2929,7 @@
         log: $('cbSaveLog').checked,
         backup: $('cbBackup').checked,
         keepBackups: $('inKeep').value,
+        backupDir: $('inBkDir') ? $('inBkDir').value : (USR.crashGuard.backupDir || ''),
         // 档位与检测时间必须原样带回，否则一次「确定」就把自动检测结果抹掉
         mode: $('selGuardMode') ? $('selGuardMode').value : USR.crashGuard.mode,
         detectedAt: USR.crashGuard.detectedAt || 0
@@ -2465,6 +2985,8 @@
     USR = Settings.normalize({
       autoCollapse: USR.autoCollapse,
       miniMetric: USR.miniMetric,
+      miniSub1: USR.miniSub1,
+      miniSub2: USR.miniSub2,
       uiDefault: USR.uiDefault,
       quotaGB: USR.quotaGB || 0,
       ui: st,
@@ -2497,6 +3019,8 @@
     USR = Settings.normalize({
       autoCollapse: USR.autoCollapse,
       miniMetric: USR.miniMetric,
+      miniSub1: USR.miniSub1,
+      miniSub2: USR.miniSub2,
       uiDefault: USR.uiDefault,
       quotaGB: USR.quotaGB || 0,
       ui: ui,
@@ -2611,6 +3135,7 @@
   /* ---------------- 初始化 ---------------- */
   function init() {
     loadCfg();
+    buildMiniOptions();   // 小窗的三个下拉（1.6.5）：选项来自 settings 的 MINI_MAIN / MINI_SUB
     migrateQuota();
     applyUiDefault();    // 首屏视图：极简 / 完整 / 沿用上次（1.6.0 起可配置）
     applyCards();        // 按 uiDefault 决定四个主项首屏是收起还是展开
@@ -2695,6 +3220,60 @@
     }
     var bkRestore = $('btnBkRestore');
     if (bkRestore) bkRestore.addEventListener('click', restoreLatest);
+
+    // 回退副本落点：选目录 / 用默认（1.6.4 起用户可改）
+    var bkPick = $('btnBkDirPick');
+    if (bkPick) bkPick.addEventListener('click', pickBackupDir);
+    var bkReset = $('btnBkDirReset');
+    if (bkReset) bkReset.addEventListener('click', function () {
+      var el = $('inBkDir');
+      if (el) el.value = '';
+      mergeGuardCfg({ backupDir: '' });
+      syncBkDirHint();
+      renderBackup();
+      toast('回退副本已用默认位置（工程目录旁）');
+    });
+
+    // 点「回退副本」那一行展开/收起最近 3 份（没有副本时不给空列表）
+    var bkHintEl = $('bkHint');
+    if (bkHintEl) bkHintEl.addEventListener('click', function () {
+      if (!ST.projectPath) { toast('先打开一个已保存的工程'); return; }
+      if (!listBackups(ST.projectPath).length) { toast('还没有回退副本（下次保护保存时生成）'); return; }
+      bkListOpen = !bkListOpen;
+      renderBackup();
+    });
+
+    // 逐份取回：用事件委托，列表行是动态生成的，不能逐个绑
+    var bkListEl = $('bkList');
+    if (bkListEl) bkListEl.addEventListener('click', function (e) {
+      var t = e.target;
+      var key = (t && t.getAttribute) ? t.getAttribute('data-bk') : null;
+      // key 为空时也要出声，不能静默 return：那是「用户点了 ↺ 却什么都没发生」。
+      // 正常情况下 listBackups() 保证 path 恒非空（见其过滤），所以这是防御性分支；
+      // 但防御分支上更该给反馈 —— 静默失败是最难报上来的一类 bug。
+      if (!key) { toast('这一份没能定位（列表可能已刷新），请重新展开'); return; }
+      // 按**路径**认那一份，不按下标认位置（见 renderBackupList 的说明）。
+      // 认身份走 Backup.pickByPath：这条路径是单测覆盖的，不在接线层再写一份等价逻辑。
+      // 重读列表是为了拿到 mtime/size 这些点击当下的事实，找的是同一个 path。
+      var fresh = ST.projectPath ? listBackups(ST.projectPath) : [];
+      var one = Backup ? Backup.pickByPath(fresh, key) : null;
+      if (!one) {
+        // 展开之后、点击之前，那份被轮转删掉了（或工程换了）
+        toast('那一份已经不在了（可能被轮转清理或工程已切换），请重新展开');
+        bkListOpen = false;
+        renderBackup();
+        return;
+      }
+      restorePick(one);
+      bkListOpen = false;
+      renderBackup();
+    });
+
+    // 小窗指标三个下拉（1.6.5）：选完立刻生效，重复的那格自动留空
+    var miniSels = [$('selMetric'), $('selSub1'), $('selSub2')];
+    for (var msi = 0; msi < miniSels.length; msi++) {
+      if (miniSels[msi]) miniSels[msi].addEventListener('change', applyMiniChoice);
+    }
 
     // 四个主项的展开键（右上角）
     for (var ck in CARD_IDS) {
@@ -2781,11 +3360,27 @@
       if (e.key === 'Escape' && !$('drawer').hidden) closeDrawer();
     });
 
-    window.addEventListener('resize', function () {
-      drawSpark(true);
-      renderDisks();
+    /* 1.7.0：拖动面板时每个 resize 事件都全量重绘（spark + 磁盘列表 + 小窗）
+       是「缩放有延迟」的另一半原因（布局过渡已在 CSS 侧去掉）。改成 rAF 合并：
+       一帧最多跑一次，且只做跟手的部分；canvas 尺寸真变了才重画 spark。 */
+    var rsPending = false, rsW = 0, rsH = 0;
+    function onResize() {
+      rsPending = false;
+      applyWidthClasses();
       checkAutoCollapse();
       renderMini();
+      var w = window.innerWidth, h = window.innerHeight;
+      if (w !== rsW || h !== rsH) {
+        rsW = w; rsH = h;
+        drawSpark(true);
+        renderDisks();
+      }
+    }
+    window.addEventListener('resize', function () {
+      if (rsPending) return;
+      rsPending = true;
+      if (window.requestAnimationFrame) window.requestAnimationFrame(onResize);
+      else setTimeout(onResize, 60);
     });
 
     // 面板被 AE 收进后台时没人看这些数，放慢到 30 秒；切回前台立刻补一次
@@ -2818,6 +3413,7 @@
     syncDrawer();
     checkAutoCollapse();
     renderMini();
+    renderMiniStats();
   }
 
   if (document.readyState === 'loading') {
