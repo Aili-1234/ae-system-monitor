@@ -5,8 +5,12 @@
      · 只用一种强调色（浅灰白），彩色仅保留给「状态」
      · 数字用等宽数字（tabular-nums），大字号 + 细字重
      · 留白优先，标签小、值大
+     · 1.7.1 起颜色全部走变量：面板主题 = 换一组变量（见下方 body[data-theme]）
    ============================================================ */
 
+/* ---------------- 默认主题：薄荷绿（= 1.7.0 及以前的样子） ----------------
+   颜色只在这里定义，别处一律 `var(--xxx)` —— 这样换主题才是「换一组变量」。
+   半透明/深色面（滚动条、抽屉底、提示框）也收成变量，否则换主题后会露出旧底色。 */
 :root {
   --bg:      #1a1a1a;
   --bg-hi:   #232323;
@@ -19,6 +23,63 @@
   --warn:    #c9a35e;
   --bad:     #c97070;
   --accent:  #6a6a6a;   /* 进度条默认色：低于告警线时用这个中性灰 */
+  --bg-lo:   #1c1c1c;   /* 抽屉底色（比 --bg 再暗一档） */
+  --bg-lo2:  #212121;   /* 抽屉里的分区底 */
+  --pop-bg:  #262626;   /* 弹出层（提示框）底 */
+  --pop-fg:  #f5f5f5;   /* 弹出层文字（比 --fg 更亮，压在 --pop-bg 上） */
+  --pop-hi:  #333333;   /* 弹出层悬停 */
+  --sbar:    #303030;   /* 页面滚动条 */
+  --sbar-hi: #3d3d3d;
+  --sbar-2:  #2e2e2e;   /* 抽屉滚动条 */
+  --mini-ico: #6e6e6e;                   /* 小窗图标色：比 --fg-3(#999) 暗一档（用户：颜色暗一些）。
+                                             1.7.1 起放在这里而**不是** .mini 里 —— 放 .mini 会被元素自身声明挡住，
+                                             主题块 body[data-theme] 覆盖不下来 */
+  --mini-ico-edge: #1d3557;              /* 图标边缘描边（深蓝）：把暗灰图标从深底上"提"出来（用户：边缘描边增强对比） */
+}
+
+/* ---------------- 面板主题（1.7.1，用户：多加几个主题） ----------------
+   五套：薄荷绿（默认，见上面 :root）/ 天青蓝 / 藕紫 / 灰色 / 淡粉。
+   都是深色底，差别在**强调色系 + 一点点底色色温**（否则只换一个圆点，看起来不像主题）。
+   warn / bad 仍是琥珀与红，只做轻微色温偏移 —— 换主题不该改变「红 = 危险」的含义。
+   只用 CSS 变量与 `body[data-theme]`，Chromium 57 / CEP 8 都认，老 AE 下界不受影响。 */
+body[data-theme="azure"] {   /* 天青蓝 */
+  --bg: #131a20; --bg-hi: #1b242c; --bg-lo: #111820; --bg-lo2: #182129;
+  --fg: #e6eef4; --fg-2: #8ea4b4; --fg-3: #93a9b8;
+  --line: #243039; --line-2: #33424e;
+  --ok: #63b3d4; --warn: #d3a45f; --bad: #cf7f86; --accent: #4d7488;
+  --pop-bg: #1b242c; --pop-fg: #f5f8fb; --pop-hi: #25313a;
+  --sbar: #25313a; --sbar-hi: #31414d; --sbar-2: #233039;
+  --mini-ico: #6d8494; --mini-ico-edge: #123a52;
+}
+
+body[data-theme="lotus"] {   /* 藕紫 */
+  --bg: #191521; --bg-hi: #221c2c; --bg-lo: #161221; --bg-lo2: #1f1a29;
+  --fg: #ece7f4; --fg-2: #a294b4; --fg-3: #a89bb8;
+  --line: #2e2739; --line-2: #3d3450;
+  --ok: #a99ad0; --warn: #cba55f; --bad: #cf8098; --accent: #6b5c8a;
+  --pop-bg: #221c2c; --pop-fg: #f6f2fa; --pop-hi: #2a2335;
+  --sbar: #2a2335; --sbar-hi: #382f47; --sbar-2: #271f31;
+  --mini-ico: #7d728f; --mini-ico-edge: #3a2a5c;
+}
+
+body[data-theme="gray"] {    /* 灰色 */
+  --bg: #202020; --bg-hi: #292929; --bg-lo: #1b1b1b; --bg-lo2: #242424;
+  --fg: #ededed; --fg-2: #a2a2a2; --fg-3: #ababab;
+  --line: #353535; --line-2: #454545;
+  --ok: #a8a8a8; --warn: #c9a35e; --bad: #c97070; --accent: #7e7e7e;
+  --pop-bg: #2b2b2b; --pop-fg: #f5f5f5; --pop-hi: #383838;
+  --sbar: #2e2e2e; --sbar-hi: #3d3d3d; --sbar-2: #2b2b2b;
+  --mini-ico: #8a8a8a; --mini-ico-edge: #4a4a4a;
+}
+
+body[data-theme="pink"] {    /* 淡粉 */
+  --bg: #1e171b; --bg-hi: #281e23; --bg-lo: #1a1418; --bg-lo2: #241b20;
+  --fg: #f5eaee; --fg-2: #b79aa4; --fg-3: #bda3ac;
+  --line: #352830; --line-2: #463640;
+  --ok: #dda3b8; --warn: #d2a763; --bad: #d97f8c; --accent: #8d6b78;
+  --pop-bg: #281e23; --pop-fg: #faf3f6; --pop-hi: #302228;
+  --sbar: #302228; --sbar-hi: #3f2e36; --sbar-2: #2c2026;
+  --mini-ico: #977f88; --mini-ico-edge: #5b1f3a;
 }
 
 * { box-sizing: border-box; }
@@ -45,8 +106,8 @@ body {
 
 body::-webkit-scrollbar { width: 6px; }
 body::-webkit-scrollbar-track { background: transparent; }
-body::-webkit-scrollbar-thumb { background: #303030; border-radius: 3px; }
-body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
+body::-webkit-scrollbar-thumb { background: var(--sbar); border-radius: 3px; }
+body::-webkit-scrollbar-thumb:hover { background: var(--sbar-hi); }
 
 .app {
   display: flex;
@@ -71,6 +132,16 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 .hd-left > * + *, .hd-right > * + * { margin-left: 5px; }
 .hd-left { flex: 1 1 auto; overflow: hidden; }
 .hd-right { flex: 0 0 auto; }
+
+/* 1.7.1：头栏 1.7.0 是 5 个控件、1.7.1 多了主题色点（+20px），300px 以下字标被挤到只剩 30px。
+   窄档把方形控件从 20px 收到 18px、间距各收 1px，把宽度还给字标（280px 实测字标盒 30→60px）。
+   只动尺寸不动结构：图标本身 9–10px，18px 方形仍装得下。 */
+@media (max-width: 320px) {
+  .hd .ibtn { width: 18px; height: 18px; }
+  .hd-right select { max-width: 34px; }
+  .hd > * + * { margin-left: 5px; }
+  .hd-left > * + *, .hd-right > * + * { margin-left: 4px; }
+}
 
 .live {
   width: 5px; height: 5px; border-radius: 50%;
@@ -677,7 +748,7 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 .toast-host > * + * { margin-top: 6px; }
 .toast {
   position: relative;
-  background: #262626; color: var(--fg);
+  background: var(--pop-bg); color: var(--fg);
   border: 1px solid var(--line-2); border-radius: 4px;
   padding: 5px 11px; font-size: 10px;
   opacity: 0; pointer-events: none;
@@ -692,9 +763,9 @@ body::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
 .toast-action {
   flex: 0 0 auto;
   background: transparent; border: 1px solid currentColor; border-radius: 3px;
-  color: #f5f5f5; padding: 3px 7px; cursor: pointer; white-space: nowrap;
+  color: var(--pop-fg); padding: 3px 7px; cursor: pointer; white-space: nowrap;
 }
-.toast-action:hover { background: #333; }
+.toast-action:hover { background: var(--pop-hi); }
 .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
 /* 小窗（极简）模式下的提示框：
@@ -723,16 +794,19 @@ body.compact .toast-action {
    宽度 ≤114px 时两格的图标连续收到 0，96px 下两列文字不再互相顶。
    （.mini 自身 display:none，但自定义属性仍会被解析，compact 时直接可用。） */
 .mini {
-  /* 1.7.0：尺寸改成定值 + 离散断点（原来用 clamp() 连续缩放，那需要 Chromium 79+，
-     而 AE 2018/CEP 8 只到 57；连续缩放还依赖布局属性过渡补帧，正是用户报的
-     「缩放过渡有延迟」的来源）。断点是离散的，拖动面板一步到位，不需要过渡。 */
-  --mini-ring: 64px;
-  --mini-gap: 9px;
-  --mini-gap-x: 16px;
-  --mini-pad-y: 10px;
-  --mini-pad-x: 6px;
-  --mini-icon: 9px;
-  --mini-icon-gap: 2px;
+  /* 1.7.1：几何尺寸改成**连续**跟随面板（用户：拉动过程要丝滑、且不能有延迟）。
+     连续缩放不用 clamp()/min()/max()（要 Chromium 79+，而 AE 2018/CEP 8 只到 57），
+     改用视口单位 vh/vw —— 环的上下限由 CSS 2.1 就有的 min/max-width、min/max-height 夹住
+     （见 .mini-ring）。全程不加任何布局过渡：尺寸每个像素都跟手、不需要补帧，
+     所以既不"跳档"，也不会像布局过渡那样在拖动时被反复重启（那正是「有延迟」的来源）。
+     字号只保留两档（基础档 + 下面的宽 ≤140px 窄档）。 */
+  --mini-ring: 30vh;                     /* 132px 高 → 39.6 被 min 44 兜住；160 → 48；200 → 60；213+ → 64（max） */
+  --mini-gap: calc(4px + 1.7vh);         /* 132 → 6.2px；300 → 9.1px */
+  --mini-gap-x: calc(4px + 4vw);         /* 96 → 7.8px；200 → 12px；280 → 15.2px */
+  --mini-pad-y: calc(3px + 2.4vh);       /* 132 → 6.2px；300 → 10.2px */
+  --mini-pad-x: calc(3px + 1.1vw);       /* 96 → 4.1px；280 → 6.1px */
+  --mini-icon: calc(5px + 1.4vh);        /* 图标随面板自动变化：132 → 6.8px；200 → 7.8px；300 → 9.2px（再由 min/max 夹在 6–9px） */
+  --mini-icon-gap: calc(1px + 0.4vh);    /* 132 → 1.5px；300 → 2.2px */
   display: none;
 }
 
@@ -758,6 +832,8 @@ body.compact .mini {
   --rc: var(--fg-2);
   position: relative;
   width: var(--mini-ring); height: var(--mini-ring);
+  min-width: 44px; min-height: 44px;     /* 1.7.1：夹上下限 —— 等价 clamp()，但 CEP 8 也认 */
+  max-width: 64px; max-height: 64px;
   border-radius: 50%;
   border: 0; padding: 0;
   display: flex; align-items: center; justify-content: center;
@@ -787,8 +863,12 @@ body.compact .mini {
 }
 .mini-label > * + * { margin-left: 3px; }
 .mini-label .mi {
-  width: 9px; height: 9px; flex: 0 0 auto;
-  fill: none; stroke: var(--fg-3); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
+  width: var(--mini-icon); height: var(--mini-icon); flex: 0 0 auto;
+  min-width: 6px; min-height: 6px; max-width: 9px; max-height: 9px;   /* 1.7.1：图标随面板自动变化，但夹在 6–9px */
+  /* 边缘描边（深蓝）：SVG 描边没法"外描边"，用四方 0.5px 投影拼出一圈深蓝边。
+     drop-shadow 在 Chromium 18+ 就有（CEP 8 也认），不动 JS、不改图标路径。 */
+  filter: drop-shadow(0.5px 0 var(--mini-ico-edge)) drop-shadow(-0.5px 0 var(--mini-ico-edge)) drop-shadow(0 0.5px var(--mini-ico-edge)) drop-shadow(0 -0.5px var(--mini-ico-edge));
+  fill: none; stroke: var(--mini-ico); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
 }
 /* 小窗占用行：左缓存、右内存，**整组居中**并各带一个图标（用户：往中间靠一点、带些图标）。
    gap 跟面板宽度连续缩放：200px 上 16px、96px 收到 5.6px；宽度不足 114px 时两格的
@@ -811,7 +891,10 @@ body.compact .mini {
 .mini-stats .ms-h i { margin-left: var(--mini-icon-gap); }
 .mini-stats .mi {
   width: var(--mini-icon); height: var(--mini-icon); flex: 0 0 auto;
-  fill: none; stroke: var(--fg-3); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
+  min-width: 6px; min-height: 6px; max-width: 9px; max-height: 9px;   /* 1.7.1：同上，图标自动变化并夹住 */
+  /* 同上：一圈深蓝边缘描边，增强与深底的对比 */
+  filter: drop-shadow(0.5px 0 var(--mini-ico-edge)) drop-shadow(-0.5px 0 var(--mini-ico-edge)) drop-shadow(0 0.5px var(--mini-ico-edge)) drop-shadow(0 -0.5px var(--mini-ico-edge));
+  fill: none; stroke: var(--mini-ico); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
 }
 .mini-stats .ms.on .mi { stroke: var(--warn); }
 .mini-stats .ms.bad .mi { stroke: var(--bad); }
@@ -841,7 +924,7 @@ body.compact .mini {
 .drawer {
   position: fixed; top: 0; right: 0; bottom: 0;
   width: 286px; max-width: 88vw;
-  background: #1c1c1c;
+  background: var(--bg-lo);
   border-left: 1px solid var(--line);
   z-index: 61;
   display: flex;
@@ -858,7 +941,7 @@ body.compact .mini {
 }
 .dw-body { padding: 4px 14px 18px; overflow-y: auto; }
 .dw-body::-webkit-scrollbar { width: 5px; }
-.dw-body::-webkit-scrollbar-thumb { background: #2e2e2e; }
+.dw-body::-webkit-scrollbar-thumb { background: var(--sbar-2); }
 
 .grp { padding: 13px 0; border-bottom: 1px solid var(--line); }
 .grp:last-of-type { border-bottom: 0; }
@@ -946,7 +1029,7 @@ input[type="checkbox"]:checked { background: var(--fg-2); border-color: var(--fg
   display: flex;
   align-items: flex-start;
   padding: 10px 11px;
-  background: #212121;
+  background: var(--bg-lo2);
   border: 1px solid var(--line-2);
   border-left: 2px solid var(--fg-3);
   border-radius: 3px;
@@ -1133,7 +1216,13 @@ body:not(.compact) .remind::-webkit-scrollbar-thumb {
 .row #inBkDir:focus { border-color: var(--fg-2); }
 
 /* ============================================================
-   1.7.0 老 AE 兼容：离散断点
+   1.7.1 老 AE 兼容 + 连续缩放（用户：拉动过程要丝滑、且不能有延迟）
+   ------------------------------------------------------------
+   几何尺寸（环、间距、内边距、图标）改成 .mini 上的视口单位变量：连续跟随面板、
+   每个像素都跟手，且不加任何布局过渡 —— 既不"跳档"，也不会像布局过渡那样在拖动时
+   反复重启（那正是用户报的「有延迟」）。上下限不用 clamp()/min()/max()（Chromium 79+，
+   AE 2018 / CEP 8 只到 57），改由 CSS 2.1 就有的 min/max-width、min/max-height 夹住。
+   下面这段是 1.7.0 的沿革（当时的离散断点做法，1.7.1 已废弃），仅留作参考：
    ------------------------------------------------------------
    下面这些原来都是 clamp()/calc(100vw) 的连续缩放（需要 Chromium 79+，
    而 AE 2018 / CEP 8 带的是 57）。改成断点后：
@@ -1146,15 +1235,7 @@ body:not(.compact) .remind::-webkit-scrollbar-thumb {
      宽 ≤ 170px  图标降到 6px
      宽 ≤ 140px  图标收 0（96px 档两列文字不再互相顶）
    ============================================================ */
-@media (max-height: 200px) {
-  .mini { --mini-ring: 56px; --mini-gap: 7px; --mini-gap-x: 13px; --mini-pad-y: 8px; }
-}
-@media (max-height: 160px) {
-  .mini { --mini-ring: 48px; --mini-gap: 5px; --mini-gap-x: 10px; --mini-pad-y: 6px; --mini-pad-x: 5px; }
-}
-@media (max-width: 170px) {
-  .mini { --mini-icon: 6px; --mini-icon-gap: 1px; }
-}
+/* 1.7.1：原有三个离散尺寸断点（max-height 200 / 160、max-width 170）已删除 —— 尺寸改成连续跟随。 */
 /* 面板变矮就横排（用户 2026-10-26 截图要求：矮的时候主显示去左边、次显示去右边）。
    竖排要 170px 左右才放得下；96px 档太窄横排放不下 —— min-width 把它挡在外面，
    那一档继续走缩小竖排。纯 CSS，随拖动实时生效，不占刷新周期。 */
@@ -1169,9 +1250,8 @@ body:not(.compact) .remind::-webkit-scrollbar-thumb {
   .mini-side .mini-row { margin-top: 4px; }
 }
 @media (max-width: 140px) {
-  .mini { --mini-icon: 0px; --mini-icon-gap: 0px; --mini-gap-x: 6px; }
-  .mini-ring > span { font-size: 11px; }
-  .mini-stats i { font-size: 7.5px; }
+  .mini { --mini-icon: 0px; --mini-icon-gap: 0px; }   /* 96px 档：图标收 0，两列文字不再互相顶 */
+  .mini-stats i { font-size: 7.5px; }                 /* 字号只留两档，这是窄档那一档 */
   .mini-stats b { font-size: 9px; }
 }
 @media (max-width: 160px) {
@@ -1179,4 +1259,22 @@ body:not(.compact) .remind::-webkit-scrollbar-thumb {
 }
 @media (max-height: 146px) {
   body:not(.compact) .rm-txt span { max-height: 3.6em; }
+}
+
+/* ---------------- 主题切换的两处控件（1.7.1） ----------------
+   顶部一个色点（随时可见）+ 抽屉「显示」组里一排色点，两处联动、点完立刻生效。
+   色点的颜色由 JS 按 THEME_DOTS 写进行内 style（清单只有一处，见 js/settings.js）。 */
+.sw { display: block; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
+.thm { display: flex; flex: 0 0 auto; align-items: center; }
+.thm-b {
+  position: relative; width: 16px; height: 16px; padding: 0; margin-left: 5px;
+  background: transparent; border: 1px solid var(--line-2); border-radius: 50%; cursor: pointer;
+}
+.thm-b > i { position: absolute; top: 3px; left: 3px; width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: block; }
+.thm-b:hover { border-color: var(--fg-2); }
+.thm-b.on { border-color: var(--fg); }
+.thm-pop {
+  position: absolute; top: 32px; right: 8px; z-index: 20;
+  display: flex; padding: 5px 6px;
+  background: var(--pop-bg); border: 1px solid var(--line-2); border-radius: 6px;
 }

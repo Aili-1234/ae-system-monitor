@@ -426,5 +426,42 @@ console.log('\n[13] GB 数值必须按 GB 显示');
   }
 }
 
+console.log('\n[新 14] 面板主题：把 main.js 里那段主题代码抠出来真跑（不靠静态断言猜）');
+{
+  const mainText = read('js/main.js');
+  const a = mainText.indexOf('  function themeList() {');
+  const b = mainText.indexOf('  /* 三个下拉的选项由 MINI_MAIN / MINI_SUB 生成');
+  const themeSrc = (a >= 0 && b > a) ? mainText.slice(a, b) : '';
+  ok('能从 main.js 里抠出主题代码块', themeSrc.indexOf('function applyTheme') >= 0 && themeSrc.length > 500);
+
+  const bodyStub = { attrs: {}, style: {}, setAttribute(k, v) { this.attrs[k] = v; } };
+  const docStub = { body: bodyStub };
+  const settsStub = {
+    THEMES: ['mint', 'azure', 'lotus', 'gray', 'pink'],
+    THEME_LABELS: { mint: '薄荷绿', azure: '天青蓝', lotus: '藕紫', gray: '灰色', pink: '淡粉' },
+    THEME_DOTS: { mint: '#7fbf9a', azure: '#63b3d4', lotus: '#a99ad0', gray: '#a8a8a8', pink: '#dda3b8' },
+    normalize(cfg) { return cfg; }
+  };
+  function api(usr) {
+    const f = new Function('document', '$', 'Settings', 'USR', 'saveCfg',
+      themeSrc + '; return { applyTheme: applyTheme, setTheme: setTheme };');
+    return f(docStub, () => null, settsStub, usr, () => {});
+  }
+
+  api({ ui: { theme: 'pink' } }).applyTheme();
+  ok('applyTheme 把当前主题写到 body 的 data-theme 上', bodyStub.attrs['data-theme'] === 'pink', bodyStub.attrs['data-theme']);
+
+  const t2 = api({ ui: { theme: 'mint' } });
+  t2.setTheme('azure');
+  ok('setTheme 换主题：立刻写进 body（不用重开面板）', bodyStub.attrs['data-theme'] === 'azure', bodyStub.attrs['data-theme']);
+
+  t2.setTheme('rainbow');
+  ok('白名单外的主题被忽略（写坏值不生效）', bodyStub.attrs['data-theme'] === 'azure', bodyStub.attrs['data-theme']);
+
+  bodyStub.attrs['data-theme'] = '';
+  api({ ui: {} }).applyTheme();
+  ok('设置里没有主题时落到默认薄荷绿', bodyStub.attrs['data-theme'] === 'mint', bodyStub.attrs['data-theme']);
+}
+
 console.log(`\n===== ${pass} 通过, ${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);

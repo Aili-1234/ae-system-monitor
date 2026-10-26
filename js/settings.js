@@ -35,7 +35,10 @@
       cache: false,
       mem:   false,
       disk:  false,
-      guard: false
+      guard: false,
+      // 面板主题（1.7.1）：五套深色主题，只换强调色系。放 ui 里是为了跟着
+      // main.js 里那句「ui: USR.ui」原样带走，不必在 7 处白名单里各补一行。
+      theme: 'mint'
     },
     crashGuard: {
       on: true,              // 崩溃前自动保存总开关
@@ -74,6 +77,20 @@
    *      · 比率 need_pct 从次显示里拿掉，换成词语指标 enough「盘够装吗」（够 / 偏紧 / 不够），
    *        判定直接复用面板既有的三条线（ST.cache.verdict），不另立阈值。
    * 名字一律用「谁的、什么量」的直白说法，别让人把「上限」读成「已用」。 */
+  /* ---------------- 面板主题（1.7.1） ----------------
+   * 用户原话：「多加几个主题，比如黑白蓝粉灰」→「预设 5 色：薄荷绿（=现在这版）/ 天青蓝
+   * 藕紫 灰色和淡粉色」。定稿五套都是**深色底**（"薄荷绿 = 现在这版"这句定了调），
+   * 只换强调色系 + 一点点底色色温；语义色 warn（琥珀）/ bad（红）保留，只做轻微色温偏移。
+   * 「薄荷绿」就是默认那套（css 的 :root），所以它没有 body[data-theme="mint"] 块。
+   * 色点颜色 THEME_DOTS 只在界面画圆点用，和 CSS 里的强调色一一对应。 */
+  var THEMES = ['mint', 'azure', 'lotus', 'gray', 'pink'];
+  var THEME_LABELS = {
+    mint: '薄荷绿', azure: '天青蓝', lotus: '藕紫', gray: '灰色', pink: '淡粉'
+  };
+  var THEME_DOTS = {
+    mint: '#7fbf9a', azure: '#63b3d4', lotus: '#a99ad0', gray: '#a8a8a8', pink: '#dda3b8'
+  };
+
   var MINI_MAIN = ['cache_pct', 'mem_free_pct', 'need_pct', 'disk_free_pct'];
   var MINI_SUB = ['none', 'cache_gb', 'mem_free_gb', 'need_gb', 'enough', 'left_gb',
                   'disk_free_gb', 'rate', 'eta'];
@@ -104,7 +121,8 @@
       cache: { type: 'bool' },
       mem:   { type: 'bool' },
       disk:  { type: 'bool' },
-      guard: { type: 'bool' }
+      guard: { type: 'bool' },
+      theme: { type: 'enum', values: THEMES, def: 'mint' }
     },
     crashGuard: {
       on:          { type: 'bool' },
@@ -236,6 +254,9 @@
     DEFAULTS: DEFAULTS,
     SCHEMA: SCHEMA,
     LIMITS: LIMITS,
+    THEMES: THEMES,
+    THEME_LABELS: THEME_LABELS,
+    THEME_DOTS: THEME_DOTS,
     MINI_MAIN: MINI_MAIN,
     MINI_SUB: MINI_SUB,
     MINI_LABELS: MINI_LABELS,

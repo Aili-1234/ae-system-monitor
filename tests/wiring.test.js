@@ -139,9 +139,9 @@ ok('小窗占用行两列各带一个内联图标',
 ok('占用行整组居中（不再顶到两侧）',
    /\.mini-stats \{[\s\S]*?justify-content: center/.test(css) &&
    !/\.mini-stats \.ms:last-child \{ text-align: right/.test(css));
-ok('两列间距随面板宽度自适应（1.7.0 flex gap → 子元素 margin + 断点变量）',
+ok('两列间距随面板宽度连续自适应（1.7.0 去 flex gap → 子元素 margin；1.7.1 变量改视口单位）',
    /\.mini-stats \.ms \+ \.ms \{ margin-left: var\(--mini-gap-x\); \}/.test(css) &&
-   /@media \(max-height: 200px\)\s*\{[^}]*--mini-gap-x: 13px/.test(css));
+   /--mini-gap-x: calc\(4px \+ 4vw\)/.test(css));
 ok('图标跟占用一起变色', /\.mini-stats \.ms\.on \.mi/.test(css) && /\.mini-stats \.ms\.bad \.mi/.test(css));
 
 console.log('\n[8b] 崩溃保护的设置项成套且可自由填数');
@@ -279,6 +279,121 @@ ok('小窗两栏的归属正确：环 + 主显示名在 .mini-main，两格 + �
 ok('环形图算术成立：r=15.9155 的周长 ≈100，stroke-dasharray:100 才配得上百分比',
    Math.abs(2 * Math.PI * 15.9155 - 100) < 0.1 && /\.arc-fg \{[^}]*stroke-dasharray: 100/.test(cssCode) &&
    /\.arc \{[^}]*transform: rotate\(-90deg\)/.test(cssCode));
+
+console.log('\n[8g] 小窗几何连续 + 图标更暗且尺寸自适 + 主显示图标换层叠横条（1.7.1）');
+ok('环尺寸连续（vh）且有上下限（min/max-width/height，不依赖 clamp）',
+   /--mini-ring: 30vh/.test(css) &&
+   /\.mini-ring \{[\s\S]{0,300}?min-width: 44px[\s\S]{0,80}?min-height: 44px/.test(css) &&
+   /max-width: 64px; max-height: 64px/.test(css));
+ok('间距/内边距/图标都连续（视口单位 + calc），图标尺寸随面板自动变化并夹在 6–9px',
+   /--mini-gap: calc\(4px \+ 1\.7vh\)/.test(css) &&
+   /--mini-pad-y: calc\(3px \+ 2\.4vh\)/.test(css) &&
+   /--mini-pad-x: calc\(3px \+ 1\.1vw\)/.test(css) &&
+   /--mini-icon: calc\(5px \+ 1\.4vh\)/.test(css) &&
+   /--mini-icon-gap: calc\(1px \+ 0\.4vh\)/.test(css) &&
+   /\.mini-label \.mi \{[\s\S]{0,260}?width: var\(--mini-icon\)[\s\S]{0,140}?min-width: 6px[\s\S]{0,90}?max-width: 9px/.test(css) &&
+   /\.mini-stats \.mi \{[\s\S]{0,260}?min-width: 6px[\s\S]{0,90}?max-width: 9px/.test(css));
+ok('离散尺寸断点已删除（横排断点与窄档窄化保留）',
+   !/@media \(max-height: 200px\)/.test(css) &&
+   !/@media \(max-height: 160px\)/.test(css) &&
+   !/@media \(max-width: 170px\)/.test(css) &&
+   /@media \(max-height: 170px\) and \(min-width: 150px\)/.test(css));
+ok('小窗图标色比正文暗一档、边缘有深蓝描边，且告警态仍覆盖（琥珀/红）',
+   /--mini-ico: #6e6e6e/.test(css) &&
+   /--mini-ico-edge: #1d3557/.test(css) &&
+   /\.mini-label \.mi \{[\s\S]{0,600}?stroke: var\(--mini-ico\)/.test(css) &&
+   /\.mini-label \.mi \{[\s\S]{0,600}?filter: drop-shadow\(0\.5px 0 var\(--mini-ico-edge\)\)/.test(css) &&
+   /\.mini-stats \.mi \{[\s\S]{0,600}?stroke: var\(--mini-ico\)/.test(css) &&
+   /\.mini-stats \.mi \{[\s\S]{0,600}?filter: drop-shadow\(0\.5px 0 var\(--mini-ico-edge\)\)/.test(css) &&
+   /\.mini-stats \.ms\.on \.mi \{ stroke: var\(--warn\); \}/.test(css) &&
+   /\.mini-stats \.ms\.bad \.mi \{ stroke: var\(--bad\); \}/.test(css));
+ok('主显示「缓存已用」图标换成层叠横条（三片错开、长度递减，刻意不等长以免与设置按钮 ≡ 撞脸），不再用叠层圆柱',
+   /cache: '<path d="M1\.2 2\.6h7\.6"\/><path d="M2\.5 5h6\.3"\/><path d="M3\.8 7\.4h3\.9"\/>'/.test(mainJs) &&
+   !/cache: '<ellipse/.test(mainJs));
+
+
+console.log('\n[8h] 面板主题（1.7.1：5 套深色主题，顶部色点 + 抽屉一行两处联动）');
+
+/* 对比度是算出来的，不是看出来的 —— 深色主题最容易出的问题就是某个色在深底上糊成一团。 */
+const wCss = css.replace(/\/\*[\s\S]*?\*\//g, '');
+function wLum(hex) {
+  const h = hex.replace('#', '');
+  const v = [0, 2, 4].map(i => {
+    const c = parseInt(h.substr(i, 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+}
+function wContrast(a, b) {
+  const l1 = wLum(a), l2 = wLum(b), hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+  return (hi + 0.05) / (lo + 0.05);
+}
+function wThemeVars(text) {
+  const out = {};
+  const re = /(:root|body\[data-theme="([a-z]+)"\])\s*\{([\s\S]*?)\}/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const name = m[2] || 'mint';
+    out[name] = out[name] || {};
+    m[3].split(';').forEach(decl => {
+      const i = decl.indexOf(':');
+      if (i < 0) return;
+      const k = decl.slice(0, i).trim();
+      if (k.indexOf('--') === 0) out[name][k] = decl.slice(i + 1).trim();
+    });
+  }
+  return out;
+}
+const wVars = wThemeVars(wCss);
+const wThemes = ['mint', 'azure', 'lotus', 'gray', 'pink'];
+
+function wPicked() {
+  return wThemes.map(t => Object.assign({}, wVars.mint, wVars[t] || {}));
+}
+function wWorst(roles) {
+  let worst = { name: '', ratio: 99 };
+  wPicked().forEach((p, i) => {
+    roles.forEach(r => {
+      const ratio = wContrast(p[r], p['--bg']);
+      if (ratio < worst.ratio) worst = { name: wThemes[i] + '/' + r, ratio: ratio };
+    });
+  });
+  return worst;
+}
+function wHexOutsideVars() {
+  const bad = [];
+  const re = /([a-zA-Z-]+)\s*:\s*([^;}]*)/g;
+  let m;
+  while ((m = re.exec(wCss))) {
+    if (/#[0-9a-fA-F]{3,8}\b/.test(m[2]) && m[1].indexOf('--') !== 0) {
+      bad.push(m[1] + ': ' + m[2].trim().slice(0, 40));
+    }
+  }
+  return bad;
+}
+
+ok('顶部有一个色点按钮（随时可换主题）', /id="btnTheme"/.test(html) && /id="themeDot"/.test(html));
+ok('顶部有一个主题小面板容器', /id="themePop"/.test(html));
+ok('抽屉「显示」组里也有一行主题色点与说明', /id="themeRow"/.test(html) && /id="themeHint"/.test(html));
+ok('main.js 有 applyTheme / buildThemeOptions / syncThemeUI / setTheme',
+  /function applyTheme\(/.test(mainJs) && /function buildThemeOptions\(/.test(mainJs) &&
+  /function syncThemeUI\(/.test(mainJs) && /function setTheme\(/.test(mainJs));
+ok('主题写到 body 的 data-theme 上（CSS 只认这个属性）', /setAttribute\('data-theme', id\)/.test(mainJs));
+ok('两处控件用同一套事件委托（动态生成的色点不能逐个挂 listener）',
+  /function themePick\(/.test(mainJs) && /\$\('themePop'\)\.addEventListener\('click', themePick\)/.test(mainJs) &&
+  /\$\('themeRow'\)\.addEventListener\('click', themePick\)/.test(mainJs));
+ok('CSS 里有四套主题块（薄荷绿是 :root 默认那套，不重复写一块）',
+  ['azure', 'lotus', 'gray', 'pink'].every(t => wCss.indexOf('body[data-theme="' + t + '"]') >= 0));
+ok('CSS 里颜色只出现在变量定义里（别处一律 var()，否则换主题会露出旧底色）',
+  wHexOutsideVars().length === 0, wHexOutsideVars().join(' | '));
+ok('每套主题都覆盖了小窗图标色与描边（否则换主题后小窗图标还是旧色）',
+  wThemes.every(t => (wVars[t] || {})['--mini-ico'] && (wVars[t] || {})['--mini-ico-edge']));
+ok('每套主题的关键文字色对底色对比度 ≥ 4.5（正文/次要/告警/危险）',
+  wWorst(['--fg', '--fg-2', '--fg-3', '--ok', '--warn', '--bad']).ratio >= 4.5,
+  '最差 ' + wWorst(['--fg', '--fg-2', '--fg-3', '--ok', '--warn', '--bad']).name + ' ' +
+  wWorst(['--fg', '--fg-2', '--fg-3', '--ok', '--warn', '--bad']).ratio.toFixed(2));
+ok('进度条中性色对底色至少可见（≥ 2，它不是文字）', wWorst(['--accent']).ratio >= 2,
+  '最差 ' + wWorst(['--accent']).name + ' ' + wWorst(['--accent']).ratio.toFixed(2));
 
 console.log('\n[9] manifest 允许折叠成窄条 / 版本覆盖');
 ok('MinSize 宽度 <= 120', /<Width>(\d+)<\/Width>/.test(manifest) &&
@@ -514,7 +629,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 259;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 276;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -560,14 +675,16 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「18 组、976 项断言」',
-     /18 组、\*\*976 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 976/976（不是旧数）',
-     /必须 976\/976/.test(report));
+  ok('PLUGIN-REPORT 声明「18 组、1003 项断言」',
+     /18 组、\*\*1003 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1003/1003（不是旧数）',
+     /必须 1003\/1003/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
-  ok('README 写 976 项', /976 项/.test(readme));
+  ok('CHANGELOG 的 1.7.1 条目写 1003 项',
+     /## 1\.7\.1[\s\S]*?1003 项/.test(changelog));
+  ok('README 写 1003 项', /1003 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

@@ -146,5 +146,15 @@ console.log('\n[新] 小窗指标可自由选（1.6.5）');
     return s.miniSub1 === 'none';
   })());
 }
+console.log('\n[新] 面板主题（1.7.1）：白名单与默认值');
+ok('THEMES 导出五套主题，第一套是薄荷绿', Array.isArray(S.THEMES) && S.THEMES.length === 5 && S.THEMES[0] === 'mint');
+ok('主题默认是薄荷绿（= 1.7.0 及以前的样子）', S.defaults().ui.theme === 'mint');
+ok('白名单外的主题退回默认（脏数据不写坏值）', S.normalize({ ui: { theme: 'rainbow' } }).ui.theme === 'mint');
+ok('每套主题都有中文名与合法色点', S.THEMES.every(t => !!S.THEME_LABELS[t] && /^#[0-9a-f]{6}$/.test(S.THEME_DOTS[t])));
+ok('主题只是 ui 里的一个字段，别的 ui 开关不受影响（一次「确定」不会重置展开状态）', (function () {
+  const c = S.normalize({ ui: { theme: 'pink', cache: true, guard: true } });
+  return c.ui.theme === 'pink' && c.ui.cache === true && c.ui.guard === true;
+})());
+
 console.log(`\n===== ${pass} 通过, ${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);

@@ -739,7 +739,7 @@
    * 也刻意不引图标字体：多一个外部依赖就多一种「这里怎么空白了」的可能。
    */
   var MI_ICONS = {
-    cache: '<ellipse cx="5" cy="2.7" rx="3.6" ry="1.5"/><path d="M1.4 2.7v4.6c0 .9 1.6 1.6 3.6 1.6s3.6-.7 3.6-1.6V2.7"/><path d="M1.4 5c0 .9 1.6 1.6 3.6 1.6S8.6 5.9 8.6 5"/>',
+    cache: '<path d="M1.2 2.6h7.6"/><path d="M2.5 5h6.3"/><path d="M3.8 7.4h3.9"/>',   /* 1.7.1：层叠横条（三片向左下错开、长度递减），替掉叠层圆柱 */
     mem:   '<rect x="2.4" y="2.4" width="5.2" height="5.2" rx="1"/><path d="M4 2.4V1M6 2.4V1M4 9V7.6M6 9V7.6M2.4 4H1M2.4 6H1M9 4H7.6M9 6H7.6"/>',
     need:  '<path d="M1.4 8.4h7.2"/><path d="M5 7V2"/><path d="M3.2 3.8 5 2l1.8 1.8"/>',
     disk:  '<circle cx="5" cy="5" r="3.5"/><circle cx="5" cy="5" r="1.1"/>',
@@ -755,7 +755,7 @@
     disk_free_gb: '磁盘可用', enough: '盘够装吗', rate: '缓存增速', eta: '多久写满', none: '不显示'
   };
 
-  // cache_pct / cache_gb 落到同一个圆柱图标
+  // cache_pct / cache_gb 落到同一个层叠横条图标（1.7.1 由叠层圆柱换成三片错位横条）
   function miIconKey(key) { return String(key || '').replace(/_(pct|gb)$/, ''); }
   function miIcon(key) { return MI_ICONS[miIconKey(key)] || ''; }
 
@@ -908,6 +908,107 @@
     if (h === null || h === undefined || !isFinite(h)) return '--';
     if (h <= 0) return '已耗尽';
     return h < 48 ? Math.round(h) + 'h' : (h / 24).toFixed(1) + '天';
+  }
+
+  /* ---------------- 面板主题（1.7.1） ----------------
+     主题只是 body 上的一个属性：`body[data-theme="azure"]` 覆盖一组 CSS 变量。
+     所以换主题不需要重绘任何数字、不碰刷新周期，也不会让布局抖一下。
+     清单（THEMES / THEME_LABELS / THEME_DOTS）只有一处出处（js/settings.js），
+     这里只负责把它画成圆点、把选择写回设置。 */
+  function themeList() {
+    return (Settings && Settings.THEMES) || ['mint'];
+  }
+
+  function themeDotColor(id) {
+    var d = (Settings && Settings.THEME_DOTS) || {};
+    return d[id] || 'var(--ok)';
+  }
+
+  function themeLabel(id) {
+    var L = (Settings && Settings.THEME_LABELS) || {};
+    return L[id] || id;
+  }
+
+  /* 把主题写到 body 上。薄荷绿是默认那套（CSS 的 :root），也照样写属性 ——
+     这样「当前用哪套」在 DOM 上永远读得出来，排查时不用猜。 */
+  function applyTheme() {
+    var id = (USR && USR.ui && USR.ui.theme) || 'mint';
+    if (themeList().indexOf(id) < 0) id = 'mint';
+    if (document.body && document.body.setAttribute) {
+      document.body.setAttribute('data-theme', id);
+    }
+    var dot = $('themeDot');
+    if (dot) dot.style.background = themeDotColor(id);
+    syncThemeUI();
+  }
+
+  /* 两处色点（顶部小面板 + 抽屉一行）都由这里生成，避免 HTML 里手写两份。 */
+  function buildThemeOptions() {
+    var list = themeList();
+    function fill(box) {
+      if (!box) return;
+      box.innerHTML = '';
+      for (var i = 0; i < list.length; i++) {
+        var b = document.createElement('button');
+        b.className = 'thm-b';
+        b.setAttribute('data-thm', list[i]);
+        b.type = 'button';
+        b.title = themeLabel(list[i]);
+        b.setAttribute('aria-label', '面板主题：' + themeLabel(list[i]));
+        b.style.color = themeDotColor(list[i]);
+        var d = document.createElement('i');
+        b.appendChild(d);
+        box.appendChild(b);
+      }
+    }
+    fill($('themeRow'));
+    fill($('themePop'));
+  }
+
+  /* 把「当前选的是哪套」画在两处控件上，并写一行说明（抽屉里那句）。 */
+  function syncThemeUI() {
+    var id = (USR && USR.ui && USR.ui.theme) || 'mint';
+    var boxes = [$('themeRow'), $('themePop')];
+    for (var i = 0; i < boxes.length; i++) {
+      var box = boxes[i];
+      if (!box || !box.querySelectorAll) continue;
+      var bs = box.querySelectorAll('.thm-b');
+      for (var j = 0; j < bs.length; j++) {
+        var cur = bs[j].getAttribute('data-thm') === id;
+        if (cur) bs[j].classList.add('on'); else bs[j].classList.remove('on');
+      }
+    }
+    var hint = $('themeHint');
+    if (hint) hint.textContent = '当前：' + themeLabel(id) + '。顶部圆点或这里的色点都能换，点完立刻生效（只换颜色，不动数据）。';
+  }
+
+  /* 点一个色点：写回设置 → 立刻应用 → 关掉小面板。 */
+  function setTheme(id) {
+    if (!USR || !Settings || themeList().indexOf(id) < 0) return;
+    USR = Settings.normalize({
+      autoCollapse: USR.autoCollapse,
+      miniMetric: USR.miniMetric,
+      miniSub1: USR.miniSub1,
+      miniSub2: USR.miniSub2,
+      uiDefault: USR.uiDefault,
+      quotaGB: USR.quotaGB || 0,
+      ui: { cache: USR.ui.cache, mem: USR.ui.mem, disk: USR.ui.disk,
+            guard: USR.ui.guard, theme: id },
+      crashGuard: USR.crashGuard,
+      reminders: USR.reminders
+    });
+    saveCfg();
+    applyTheme();
+  }
+
+  /* 事件委托：色点是动态生成的，逐个挂 listener 会随重建失效。 */
+  function themePick(e) {
+    var t = e.target;
+    while (t && t !== this && !(t.getAttribute && t.getAttribute('data-thm'))) t = t.parentNode;
+    if (!t || t === this || !t.getAttribute) return;
+    setTheme(t.getAttribute('data-thm'));
+    var pop = $('themePop');
+    if (pop) pop.hidden = true;
   }
 
   /* 三个下拉的选项由 MINI_MAIN / MINI_SUB 生成 —— 清单只有一处，
@@ -2745,6 +2846,7 @@
     if ($('selSub2')) $('selSub2').value = USR.miniSub2 || 'none';
     pruneMiniSelects();
     if ($('selUiDefault')) $('selUiDefault').value = USR.uiDefault || 'compact';
+    syncThemeUI();   // 抽屉里的主题色点要跟上当前值（1.7.1）
     syncRemindSummary();
 
     DW_FIELDS.forEach(function (f) {
@@ -3136,6 +3238,8 @@
   function init() {
     loadCfg();
     buildMiniOptions();   // 小窗的三个下拉（1.6.5）：选项来自 settings 的 MINI_MAIN / MINI_SUB
+    buildThemeOptions();  // 面板主题的两处色点（1.7.1）：选项来自 settings 的 THEMES
+    applyTheme();         // 首屏就把上次选的主题穿上，晚一步会闪一下默认色
     migrateQuota();
     applyUiDefault();    // 首屏视图：极简 / 完整 / 沿用上次（1.6.0 起可配置）
     applyCards();        // 按 uiDefault 决定四个主项首屏是收起还是展开
@@ -3167,6 +3271,15 @@
     });
 
     $('btnCopy').addEventListener('click', function () { copyText(buildReport()); });
+
+    // 面板主题（1.7.1）：顶部色点开关小面板；顶部与抽屉两处都用同一套事件委托
+    $('btnTheme').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var pop = $('themePop');
+      if (pop) pop.hidden = !pop.hidden;
+    });
+    if ($('themePop')) $('themePop').addEventListener('click', themePick);
+    if ($('themeRow')) $('themeRow').addEventListener('click', themePick);
 
     $('btnOpen').addEventListener('click', function () {
       var p = ST.cache.path || ST.cache.prefFolder;

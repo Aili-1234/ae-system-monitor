@@ -28,9 +28,13 @@
       <button id="btnRefresh" class="ibtn" title="立即刷新（含缓存重扫）">⟳</button>
       <button id="btnCopy" class="ibtn" title="复制诊断简报">⧉</button>
       <button id="btnCompact" class="ibtn" title="折叠为小窗">−</button>
+      <button id="btnTheme" class="ibtn" title="面板主题"><span class="sw" id="themeDot"></span></button>
       <button id="btnCfg" class="ibtn" title="设置">≡</button>
     </div>
   </header>
+
+  <!-- 主题小面板：色点由 js/settings.js 的 THEMES / THEME_DOTS 生成（清单只有一处） -->
+  <div class="thm-pop" id="themePop" hidden></div>
 
   <div class="alert" id="alertBox" hidden><span id="alertText"></span></div>
 
@@ -201,6 +205,11 @@
         <input type="checkbox" id="cbAuto" />
         <label for="cbAuto">面板变窄时自动折叠</label>
       </div>
+      <div class="row">
+        <label>面板主题</label>
+        <div class="thm" id="themeRow"></div>
+      </div>
+      <div class="hint" id="themeHint"></div>
       <!-- 三个下拉的选项由 js/settings.js 的 MINI_MAIN / MINI_SUB 生成（唯一出处），
            这里留空即可 —— 选项清单不会和 main.js 的取值逻辑各写一份。 -->
       <div class="row">
