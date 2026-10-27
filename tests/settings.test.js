@@ -167,5 +167,36 @@ ok('白粉那套叫「白粉」（1.7.4：底色比象牙白更白、文字转�
 ok('八套主题各有中文名与合法色点（色点用来画头栏那个小圆）',
   S.THEMES.every(t => !!S.THEME_LABELS[t] && /^#[0-9a-f]{6}$/.test(S.THEME_DOTS[t])));
 
+console.log('\n[新] 主题不会因为「只传了部分 ui 字段」被冲掉（1.7.6 的真因）');
+/* normalize 是拿 SCHEMA 把 ui **整块重建**的 —— 没传到的键一律退回 DEFAULTS。
+   所以只要有一处写成 `ui: { cache, mem, disk, guard }`（漏掉 theme），
+   theme 就会被冲回默认的 'mint'，而且那一处紧接着就 saveCfg() 写盘。
+   真机上表现为：改完主题、重开面板又变回薄荷绿。
+   下面三条把这个陷阱钉死 —— 前一条描述 bug 的形状，后两条描述修好后的形状。 */
+ok('只传四张卡的展开状态 → theme 被静默冲回默认 mint（bug 的形状）',
+   S.normalize({ ui: { cache: true, mem: false, disk: false, guard: false } }).ui.theme === 'mint');
+ok('把 theme 一起传进去 → 原样保留，展开状态照旧生效', (function () {
+  const c = S.normalize({ ui: { cache: true, mem: false, disk: false, guard: false, theme: 'black' } });
+  return c.ui.theme === 'black' && c.ui.cache === true;
+})());
+ok('写盘（stringify）再读回（parse）主题还在 —— 对应「下次启动读回」',
+   S.parse(S.stringify({ ui: { cache: false, mem: false, disk: false, guard: false, theme: 'mist' } })).ui.theme === 'mist');
+
+console.log('\n[新] 小窗形态（1.7.6）：默认开 + miniWin 往返 + 脏值回落默认值');
+/* 用户原话「装好一打开就该是小窗」「我要一开始就是这个界面，并且可以记忆的」——
+   默认值取 true：**装好/首次打开**就是小窗，不是「先手动折一次才记住」；
+   手动展开 / 折叠过之后记住，下次开 AE 照上次那个形态起。
+   它和 theme 是同一类陷阱：也是顶层字段，将来若有人在某个调用点手写白名单时
+   漏掉它，就会被 walk() 按 DEFAULTS 冲掉（形态悄悄丢）。1.7.6 把白名单整个拆成了
+   normFromUSR（从整份 USR 出发），所以这里只需钉住默认值、往返与脏值这三条。 */
+ok('miniWin 默认开（用户要「装好一打开就是小窗」）', S.defaults().miniWin === true);
+ok('miniWin 往返：true 存读仍是 true、false 存读仍是 false（对应「下次启动读回」）',
+   S.parse(S.stringify({ miniWin: true })).miniWin === true &&
+   S.parse(S.stringify({ miniWin: false })).miniWin === false);
+ok('miniWin 的脏值一律回落默认值 true（字符串 / 数字 / null）',
+   S.normalize({ miniWin: 'yes' }).miniWin === true &&
+   S.normalize({ miniWin: 1 }).miniWin === true &&
+   S.normalize({ miniWin: null }).miniWin === true);
+
 console.log(`\n===== ${pass} 通过, ${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);

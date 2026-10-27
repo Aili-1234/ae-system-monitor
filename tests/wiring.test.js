@@ -511,11 +511,41 @@ ok('main.js 有 applyUiDefault', /function applyUiDefault\(\)/.test(mainJs));
 ok('init 时应用 uiDefault', /applyUiDefault\(\);/.test(mainJs));
 ok('设置抽屉回填 uiDefault', /selUiDefault'\)\.value = USR\.uiDefault/.test(mainJs));
 ok('设置抽屉写入 uiDefault', /uiDefault:\s*\$\('selUiDefault'\)\.value/.test(mainJs));
-ok('每处 normalize 都带回 uiDefault（否则会被重置）',
-   (mainJs.match(/Settings\.normalize\(\{/g) || []).length ===
-   (mainJs.match(/uiDefault:\s*USR\.uiDefault|uiDefault:\s*\$\('selUiDefault'\)\.value/g) || []).length,
-   (mainJs.match(/Settings\.normalize\(\{/g) || []).length + ' 处 normalize / ' +
-   (mainJs.match(/uiDefault:\s*USR\.uiDefault|uiDefault:\s*\$\('selUiDefault'\)\.value/g) || []).length + ' 处带 uiDefault');
+/* 1.7.6 把「手写白名单」整个拆掉了 —— 主题丢失的**根因形状**不是某一个键写漏了，
+ * 而是每个调用点各自手写一份白名单（把 USR 的字段一个个列出来），漏掉哪个键，
+ * walk() 就把它按 DEFAULTS 冲掉。settings.js 里那句「放 ui 里是为了……不必在
+ * 7 处白名单里各补一行」就是当年绕开它的痕迹 —— 绕过的那两处后来就丢了主题。
+ * 现在一律 normFromUSR({只写本次要改的键})，从整份 USR 出发。 */
+ok('main.js 里没有裸的 Settings.normalize({...}) 手写白名单（一律走 normFromUSR）',
+   (mainJs.match(/Settings\.normalize\(\{/g) || []).length === 0,
+   '裸白名单 ' + (mainJs.match(/Settings\.normalize\(\{/g) || []).length + ' 处');
+ok('normFromUSR 从整份 USR 出发再用本次的键覆盖（将来新增字段不必去 N 处各补一行）',
+   /function normFromUSR\(over\)[\s\S]{0,420}?for \(k in USR\)[\s\S]{0,220}?for \(k in over\)[\s\S]{0,220}?return Settings\.normalize\(base\)/.test(mainJs) &&
+   (mainJs.match(/normFromUSR\(/g) || []).length >= 7,
+   'normFromUSR 用到 ' + (mainJs.match(/normFromUSR\(/g) || []).length + ' 处');
+
+/* theme 与 uiDefault 是同一类陷阱，但 theme 漏掉的后果最贵 ——
+ * `ui` 里其余四个键只是四张卡的展开状态，漏了顶多被按回首屏；
+ * theme 漏了就等于「用户选的主题被静默改成薄荷绿，还立刻写进盘」。
+ * 而且漏 theme 的两处（applyUiDefault / setCard）一个是**每次启动**都跑、
+ * 一个是**每次手动展开收起**都跑 —— 1.7.6 修的就是这个。
+ * 合法写法只有两种：整块带回（ui: USR.ui），或用 uiWith(...) 合成（自带 theme）。 */
+ok('归一化全部从整份 USR 出发 —— theme / uiDefault 都失去了「被漏掉」的可能',
+   !/Settings\.normalize\(\{/.test(mainJs) && /function normFromUSR\(over\)/.test(mainJs));
+
+/* 小窗形态（1.7.6）：用户要「装好一打开就是小窗」，而且之后要能记住。
+ * 默认值必须是 **true**（装好即小窗）；只记**手动**切换 —— checkAutoCollapse
+ * 的自动折叠是跟着面板宽度走的，写进去会把「因为面板窄才折」误存成「用户要小窗」。 */
+ok('小窗形态：schema + 默认开（装好即小窗）+ 手动切换时写盘 + 启动时恢复',
+   /miniWin:\s*\{ type: 'bool' \}/.test(settings) && /miniWin: true/.test(settings) &&
+   /function rememberMini\(\)/.test(mainJs) &&
+   /normFromUSR\(\{ miniWin: !!compact \}\)/.test(mainJs) &&
+   /if \(USR && USR\.miniWin\) setCompact\(true, true\)/.test(mainJs));
+ok('自动折叠不污染小窗形态（rememberMini 只在 toggleCompact 里调，不在 checkAutoCollapse 里）',
+   /function toggleCompact\(silent\) \{[\s\S]{0,220}?rememberMini\(\)/.test(mainJs) &&
+   !/function checkAutoCollapse\(\)[\s\S]{0,700}?rememberMini\(\)/.test(mainJs));
+ok('main.js 有 uiWith()：合成 ui 时负责把 theme 补回来',
+   /function uiWith\(st\)/.test(mainJs) && /ui:\s*uiWith\(st\)/.test(mainJs) && /ui:\s*uiWith\(ui\)/.test(mainJs));
 
 console.log('\n[13] 极简 / 正常两种模式的提醒优化（1.6.0）');
 ok('提醒条与小窗都有紧凑样式', /body\.compact \.remind\s*\{/.test(css));
@@ -689,7 +719,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 293;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 298;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -735,10 +765,10 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「19 组、1052 项断言」',
-     /19 组、\*\*1052 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1052/1052（不是旧数）',
-     /必须 1052\/1052/.test(report));
+  ok('PLUGIN-REPORT 声明「19 组、1057 项断言」',
+     /19 组、\*\*1063 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1057/1057（不是旧数）',
+     /必须 1063\/1063/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
@@ -747,7 +777,7 @@ console.log('\n[18] 文档测试计数与实测一致');
   ok('CHANGELOG 的 1.7.2 / 1.7.3 / 1.7.4 条目写对了计数',
      /## 1\.7\.2[\s\S]*?1016 项/.test(changelog) && /## 1\.7\.3[\s\S]*?1018 项/.test(changelog) &&
      /## 1\.7\.4[\s\S]*?1024 项/.test(changelog));
-  ok('README 写 1052 项', /1052 项/.test(readme));
+  ok('README 写 1063 项', /1063 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

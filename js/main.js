@@ -217,6 +217,27 @@
     try { localStorage.setItem(CFG_KEY, text); } catch (e) {}
   }
 
+  /* 归一化时一律从**整份 USR** 出发，只覆盖本次要改的键（1.7.6）。
+     老写法是每个调用点手写一份白名单，把 USR 的字段一个个列出来 —— 漏掉哪个键，
+     walk() 就会把它按 DEFAULTS 冲掉。用户的主题就是这么被冲回薄荷绿的
+     （settings.js 里那条「放 ui 里就不必在 7 处白名单各补一行」的注释，正是
+     当年为了绕开这个脆弱点而做的取舍 —— 绕过去的两处就成了漏网之鱼）。
+     改成从整份 USR 出发后，新增字段不必再去 7 个地方各补一行。 */
+  function normFromUSR(over) {
+    var base = {}, k;
+    for (k in USR) if (Object.prototype.hasOwnProperty.call(USR, k)) base[k] = USR[k];
+    for (k in over) if (Object.prototype.hasOwnProperty.call(over, k)) base[k] = over[k];
+    return Settings.normalize(base);
+  }
+
+  /* 用户手动折叠 / 展开后把形态记进配置（1.7.6）。只在**手动**切换时写：
+     checkAutoCollapse() 的自动折叠跟着面板宽度走，写进去会污染这个语义。 */
+  function rememberMini() {
+    if (!USR) return;
+    USR = normFromUSR({ miniWin: !!compact });
+    saveCfg();
+  }
+
   /* ---------------- 基础工具 ---------------- */
   function $(id) { return document.getElementById(id); }
   function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
@@ -1063,17 +1084,9 @@
   /* 点一个色点：写回设置 → 立刻应用 → 关掉小面板。 */
   function setTheme(id) {
     if (!USR || !Settings || themeList().indexOf(id) < 0) return;
-    USR = Settings.normalize({
-      autoCollapse: USR.autoCollapse,
-      miniMetric: USR.miniMetric,
-      miniSub1: USR.miniSub1,
-      miniSub2: USR.miniSub2,
-      uiDefault: USR.uiDefault,
-      quotaGB: USR.quotaGB || 0,
+    USR = normFromUSR({
       ui: { cache: USR.ui.cache, mem: USR.ui.mem, disk: USR.ui.disk,
-            guard: USR.ui.guard, theme: id },
-      crashGuard: USR.crashGuard,
-      reminders: USR.reminders
+            guard: USR.ui.guard, theme: id }
     });
     saveCfg();
     applyTheme();
@@ -1136,16 +1149,10 @@
   function applyMiniChoice() {
     if (!USR || !Settings) return;
     var fixed = pruneMiniSelects();
-    USR = Settings.normalize({
-      autoCollapse: USR.autoCollapse,
+    USR = normFromUSR({
       miniMetric: fixed ? fixed.miniMetric : USR.miniMetric,
       miniSub1: fixed ? fixed.miniSub1 : USR.miniSub1,
-      miniSub2: fixed ? fixed.miniSub2 : USR.miniSub2,
-      uiDefault: USR.uiDefault,
-      quotaGB: USR.quotaGB || 0,
-      ui: USR.ui,
-      crashGuard: USR.crashGuard,
-      reminders: USR.reminders
+      miniSub2: fixed ? fixed.miniSub2 : USR.miniSub2
     });
     saveCfg();
     renderMini();
@@ -1245,6 +1252,7 @@
   function toggleCompact(silent) {
     autoCollapsed = false;
     setCompact(!compact, silent);
+    rememberMini();          // 1.7.6：手动折了 / 展开了，就记住这个形态
   }
 
   function checkAutoCollapse() {
@@ -2860,17 +2868,7 @@
         everyMin: REMIND_PRESET[id] !== undefined ? REMIND_PRESET[id] : 45
       };
     }
-    USR = Settings.normalize({
-      autoCollapse: USR.autoCollapse,
-      miniMetric: USR.miniMetric,
-      miniSub1: USR.miniSub1,
-      miniSub2: USR.miniSub2,
-      uiDefault: USR.uiDefault,
-      quotaGB: USR.quotaGB || 0,
-      ui: USR.ui,
-      crashGuard: USR.crashGuard,
-      reminders: rem
-    });
+    USR = normFromUSR({ reminders: rem });
     saveCfg();
     syncDrawer();
     toast('已填入常用间隔：喝水 45 / 起身 60 / 远眺 40 / 内存 30 分');
@@ -3021,17 +3019,7 @@
     };
     for (var k in patch) { if (patch.hasOwnProperty(k)) ng[k] = patch[k]; }
 
-    USR = Settings.normalize({
-      autoCollapse: USR.autoCollapse,
-      miniMetric: USR.miniMetric,
-      miniSub1: USR.miniSub1,
-      miniSub2: USR.miniSub2,
-      uiDefault: USR.uiDefault,
-      quotaGB: USR.quotaGB || 0,
-      ui: USR.ui,
-      crashGuard: ng,
-      reminders: USR.reminders
-    });
+    USR = normFromUSR({ crashGuard: ng });
     saveCfg();
     if (grd) grd.configure(USR.crashGuard);
   }
@@ -3092,14 +3080,14 @@
       cooldownMin: $('inCool').value
     };
 
-    USR = Settings.normalize({
+    USR = normFromUSR({
       autoCollapse: $('cbAuto').checked,
       miniMetric: $('selMetric') ? $('selMetric').value : USR.miniMetric,
       miniSub1: $('selSub1') ? $('selSub1').value : USR.miniSub1,
       miniSub2: $('selSub2') ? $('selSub2').value : USR.miniSub2,
       uiDefault: $('selUiDefault').value,
-      quotaGB: USR.quotaGB || 0,          // 上限不在抽屉里改，但要原样带回去，否则会被重置成自动
-      ui: USR.ui,                          // 展开状态同理，不能被一次「确定」重置回首屏收起
+      // 缓存上限（quotaGB）与展开状态（ui）不再手写：normFromUSR 从整份 USR 出发，
+      // 没提到的键自然原样带走 —— 老写法漏一行就会被重置成自动检测／首屏收起。
       crashGuard: {
         on: $('cbGuard').checked,
         autoSave: $('cbGuardWrite').checked,
@@ -3157,22 +3145,27 @@
     };
   }
 
+  /* 把「四张卡的展开状态」与「当前主题」合成一份完整的 ui。
+     必须显式带上 theme：Settings.normalize 是按 SCHEMA 把 ui 整个重建的，
+     ui 里漏掉 theme 就只能在 DEFAULTS 里取到 'mint' —— 于是
+     applyUiDefault()（每次启动都会跑）与 setCard()（每次手动展开/收起）
+     都会把用户选的主题悄悄冲回薄荷绿，还立刻 saveCfg() 写进盘里。
+     这就是 1.7.5 之后「主题改完、重开就变回薄荷绿」的真因（1.7.6 修）。 */
+  function uiWith(st) {
+    var d = (Settings && Settings.DEFAULTS && Settings.DEFAULTS.ui) || {};
+    var cur = (USR && USR.ui) || {};
+    return {
+      cache: !!st.cache, mem: !!st.mem, disk: !!st.disk, guard: !!st.guard,
+      theme: cur.theme || d.theme || 'mint'
+    };
+  }
+
   /* 首屏应用 uiDefault。remember 模式下不动 USR.ui（沿用上次）。 */
   function applyUiDefault() {
     if (!Settings || !USR) return;
     if (USR.uiDefault === 'remember') return;
     var st = initialCardState();
-    USR = Settings.normalize({
-      autoCollapse: USR.autoCollapse,
-      miniMetric: USR.miniMetric,
-      miniSub1: USR.miniSub1,
-      miniSub2: USR.miniSub2,
-      uiDefault: USR.uiDefault,
-      quotaGB: USR.quotaGB || 0,
-      ui: st,
-      crashGuard: USR.crashGuard,
-      reminders: USR.reminders
-    });
+    USR = normFromUSR({ ui: uiWith(st) });
     saveCfg();
   }
 
@@ -3196,16 +3189,11 @@
       disk: !!USR.ui.disk, guard: !!USR.ui.guard
     };
     ui[k] = !!open;
-    USR = Settings.normalize({
-      autoCollapse: USR.autoCollapse,
-      miniMetric: USR.miniMetric,
-      miniSub1: USR.miniSub1,
-      miniSub2: USR.miniSub2,
-      uiDefault: USR.uiDefault,
-      quotaGB: USR.quotaGB || 0,
-      ui: ui,
-      crashGuard: USR.crashGuard,
-      reminders: USR.reminders
+    USR = normFromUSR({
+      // 用户亲手展开/收起过某一项，就说明他要的是「沿用上次」而不是每次被
+      // uiDefault 按回首屏状态 —— 所以这里顺手切到 remember（1.7.6）。
+      uiDefault: 'remember',
+      ui: uiWith(ui)
     });
     saveCfg();
     applyCards();
@@ -3321,6 +3309,11 @@
     migrateQuota();
     applyUiDefault();    // 首屏视图：极简 / 完整 / 沿用上次（1.6.0 起可配置）
     applyCards();        // 按 uiDefault 决定四个主项首屏是收起还是展开
+    // 小窗形态（1.7.6）：miniWin 默认 true —— 装好一打开就是小窗；用户手动展开过
+    // （miniWin=false）就照展开起。一律**读配置**，不猜面板宽度。
+    // 放在 applyCards 之后：这里只换面板形态，卡片首屏状态仍由上面两步决定。
+    // 走自动折叠（checkAutoCollapse）不写 miniWin，所以不会被「面板窄才折」带偏。
+    if (USR && USR.miniWin) setCompact(true, true);
     if (Settings && Reminder) {
       ENG = Reminder.create({});
       // 每秒跑一次纯计算，不读磁盘、不读系统，开销可以忽略

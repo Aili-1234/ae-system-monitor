@@ -20,6 +20,12 @@
 
   var DEFAULTS = {
     autoCollapse: true,      // 面板变窄时自动折叠
+    // 小窗形态（1.7.6）：默认 true —— 用户要「装好、一打开就是小窗」，
+    // 所以首次打开（配置里还没有这个键）走小窗，不是先手动折一次才记住。
+    // 之后**手动**折叠 / 展开会被记住，下次开 AE 照上次那个形态起。
+    // 只记**手动**切换 —— 自动折叠是跟着面板宽度走的，写进去会把
+    // 「因为面板窄才折」误存成「用户要小窗」。
+    miniWin: true,
     // 小窗显示（1.6.5 起可自由选）：主要那个画环，下面还有两格可配。
     // 清单见下面的 MINI_MAIN / MINI_SUB —— 换指标不用改别处，这里只是默认值。
     miniMetric: 'cache_pct',   // 主显示：磁盘缓存已用 %
@@ -28,6 +34,9 @@
     quotaGB: 0,              // 手动设定的缓存上限；0 = 自动检测（优先读 AE 偏好）
     // 首屏视图：compact 全部收起(极简) / full 全部展开(完整) / remember 沿用上次的展开状态
     // 1.6.0 新增。此前是硬编码"全部收起"，用户想看细节就得逐个点开。
+    // 1.7.6：默认仍是 compact（极简），与 1.7.4/1.7.5 一致。
+    // 「极简 / 详细」的沿用改为在 setCard() 里做：用户亲手展开或收起过某一项，
+    // 就把 uiDefault 切成 remember，之后每次启动都沿用上次的展开状态。
     uiDefault: 'compact',
     // 四个主项的展开状态（true = 展示细节）
     // uiDefault=remember 时读这里；compact/full 时由它决定首屏
@@ -120,6 +129,8 @@
   // 每个字段的约束。新增字段只要在这里加一行，校验就自动生效。
   var SCHEMA = {
     autoCollapse: { type: 'bool' },
+    // 小窗形态（1.7.6）：见 DEFAULTS 里的说明。加一行即可，校验自动生效。
+    miniWin:      { type: 'bool' },
     // alias：1.6.4 及以前的 cache / mem 两个老值，迁移到新的四个指标
     miniMetric:   { type: 'enum', values: MINI_MAIN, alias: { cache: 'cache_pct', mem: 'mem_free_pct' } },
     miniSub1:     { type: 'enum', values: MINI_SUB },

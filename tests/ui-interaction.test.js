@@ -431,8 +431,15 @@ console.log('\n[新 14] 面板主题：把 main.js 里那段主题代码抠出�
   const mainText = read('js/main.js');
   const a = mainText.indexOf('  function themeList() {');
   const b = mainText.indexOf('  /* 三个下拉的选项由 MINI_MAIN / MINI_SUB 生成');
-  const themeSrc = (a >= 0 && b > a) ? mainText.slice(a, b) : '';
-  ok('能从 main.js 里抠出主题代码块', themeSrc.indexOf('function applyTheme') >= 0 && themeSrc.length > 500);
+  /* setTheme 现在走 normFromUSR（1.7.6 拆掉了手写白名单），所以它也得一起真跑。
+     塞一个假实现进来最省事，但这组就不再是「真跑源码」了 —— 自己把测试掏空。 */
+  const c = mainText.indexOf('  function normFromUSR(over) {');
+  const d = mainText.indexOf('  /* 用户手动折叠');
+  const normSrc = (c >= 0 && d > c) ? mainText.slice(c, d) : '';
+  const themeSrc = ((a >= 0 && b > a) ? mainText.slice(a, b) : '') + '\n' + normSrc;
+  ok('能从 main.js 里抠出主题代码块 + 真实的 normFromUSR',
+     themeSrc.indexOf('function applyTheme') >= 0 &&
+     themeSrc.indexOf('function normFromUSR(over)') >= 0 && themeSrc.length > 500);
 
   const bodyStub = { attrs: {}, style: {}, setAttribute(k, v) { this.attrs[k] = v; } };
   const docStub = { body: bodyStub };
