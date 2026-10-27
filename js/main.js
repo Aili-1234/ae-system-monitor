@@ -136,16 +136,85 @@
   var grd = null;             // 崩溃保护判定器（js/guard.js）
   var guardBusy = false;      // 一次保存请求进行中，避免叠加
 
+  /* ---------------- 设置持久化 ----------------
+     1.7.5：设置不再只存 localStorage。
+
+     为什么改：CEP 面板的 localStorage 由 CEF profile 管理，**进程退出时的刷盘时机
+     不由页面控制**。实测（真机 + 真 CEP）：改完主题点 ✕ 关掉、甚至立刻完全退出 AE，
+     重开后 sysmon.cfg 可能还是旧值 —— 表现为「主题/设置变回默认」。
+     同一台机器上，saves.log（走 Node fs）却能可靠幸存。差别只在存储通道。
+
+     所以：**文件为主，localStorage 降级为缓存**。
+       · 写：先写文件（writeFileSync 立即落盘），再顺带写一份 localStorage。
+       · 读：文件优先；文件不存在或读坏了，回退 localStorage。
+       · 非 CEP（浏览器预览 hasNode=false）：自动退回纯 localStorage，行为与改前一致。
+     存的是同一份规范化 JSON，两个通道内容一致，不引入第二套 schema。
+
+     路径与 saves.log 同目录：%LOCALAPPDATA%\AESystemMonitor\settings.json */
+  function cfgFilePath() {
+    if (!hasNode || !fs || !pathmod) return '';
+    try {
+      var dir = localDataDir();
+      return dir ? pathmod.join(dir, 'settings.json') : '';
+    } catch (e) { return ''; }
+  }
+
+  function readCfgFile() {
+    var p = cfgFilePath();
+    if (!p) return '';
+    try {
+      if (!fs.existsSync(p)) return '';
+      var s = fs.readFileSync(p, 'utf8');
+      return (s && s.trim()) ? s : '';
+    } catch (e) { return ''; }
+  }
+
+  function writeCfgFile(text) {
+    var p = cfgFilePath();
+    if (!p) return false;
+    try {
+      fs.mkdirSync(pathmod.dirname(p), { recursive: true });
+      fs.writeFileSync(p, text, 'utf8');
+      return true;
+    } catch (e) { return false; }
+  }
+
   function loadCfg() {
+    if (!Settings) { USR = null; return; }
+
+    // 1) 文件优先 —— 这是唯一能扛住 CEP 进程退出的通道
+    var fromFile = readCfgFile();
+    if (fromFile) {
+      USR = Settings.parse(fromFile);
+      // 文件读到了，但 localStorage 可能是旧的（老版本写下的）或是空的。
+      // 两种情况都回写一次，让两个通道对齐，避免下次回退时读到旧值。
+      try {
+        if (localStorage.getItem(CFG_KEY) !== fromFile) localStorage.setItem(CFG_KEY, fromFile);
+      } catch (e) {}
+      return;
+    }
+
+    // 2) 回退 localStorage（老版本升级上来的第一次启动走这里）
     var raw = '';
     try { raw = localStorage.getItem(CFG_KEY) || ''; } catch (e) {}
-    if (!Settings) { USR = null; return; }
     USR = raw ? Settings.parse(raw) : Settings.defaults();
+
+    // 3) 迁移：把 localStorage 里的设置搬进文件，之后就走文件通道。
+    //    迁移失败不影响本次使用（USR 已经是对的），也不清 localStorage。
+    if (raw) {
+      var norm = Settings.stringify(USR);
+      if (writeCfgFile(norm)) {
+        try { localStorage.setItem(CFG_KEY, norm); } catch (e) {}
+      }
+    }
   }
 
   function saveCfg() {
     if (!USR || !Settings) return;
-    try { localStorage.setItem(CFG_KEY, Settings.stringify(USR)); } catch (e) {}
+    var text = Settings.stringify(USR);
+    // 先写文件：失败也不阻断，localStorage 仍是一层可用兜底
+    writeCfgFile(text);
+    try { localStorage.setItem(CFG_KEY, text); } catch (e) {}
   }
 
   /* ---------------- 基础工具 ---------------- */

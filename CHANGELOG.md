@@ -1,5 +1,69 @@
 # 变更记录
 
+## 1.7.5 — 2026-10-27
+
+修一个**用户真机报上来的设置丢失 bug**，根因不在主题，在存储通道。
+
+### 现象
+
+用户改完主题、点右上角 `✕` 关掉面板，**再打开（甚至完全退出 AE 再进）主题变回默认薄荷绿**。
+用户原话：「这个插件的主题颜色不会保留上次设置」；补充「我改完后右上角 ❌ 后再打开后主题变默认了」。
+
+### 排查过程（为什么不是「主题没存」）
+
+逐环实测都正常，所以一开始的猜测全部被推翻：
+
+- 点击色点后 `sysmon.cfg` 里**确实写入了**目标主题（headless Chrome 抓 localStorage 求证）；
+- `Page.reload` 重载后主题保持（走完整重新初始化）；
+- 关闭设置抽屉（`dwClose`）再打开，色点高亮正确停在所选主题（`closeDrawer` 只隐藏 DOM、`openDrawer` 会 `syncDrawer` 从 `USR` 反向刷新，`USR` 是对的）；
+- `setTheme` / `Settings.normalize` / `stringify` / `parse` 链路单独跑，全部正常。
+
+**唯一没被覆盖的环节 = CEP 进程被销毁**（关面板 / 退出 AE）。这一条由用户确认后成了定案。
+
+### 根因
+
+`sysmon.cfg`（全部设置）与 `sysmon.cacheHist`（采样）**只有 `localStorage` 一条通道**。
+而 CEP 面板的 `localStorage` 由 **CEF profile 管理，进程退出时刷盘时机不由页面控制** ——
+面板被销毁时写下去的值可能还没落盘，重开后读到的仍是旧值。
+
+**同一台机器上的反证**：`saves.log`（保存日志）走 Node 的 `fs.appendFileSync`，**能可靠幸存**。
+同一个文件里，两条通道的差别就是这次 bug 的全部。
+
+### 改法：文件为主，localStorage 降级为缓存
+
+只动 `js/main.js` 的持久化两个函数（`loadCfg` / `saveCfg`），新增三个小工具：
+
+| 函数 | 作用 |
+|---|---|
+| `cfgFilePath()` | 与 `saves.log` **同目录**：`%LOCALAPPDATA%\AESystemMonitor\settings.json`（macOS / Linux 沿用既有分平台规则） |
+| `readCfgFile()` | 文件不存在或读坏都返回空串，不抛 |
+| `writeCfgFile()` | `mkdirSync(recursive)` + `writeFileSync`，失败返回 `false`、不抛 |
+
+- **写**：先写文件（立即落盘），再顺带写一份 `localStorage`。
+- **读**：**文件优先**；文件不存在（老用户首次升级）则回退 `localStorage`，然后把内容**迁移进文件**。
+- **对齐**：读到文件时若 `localStorage` 是旧值，顺手回写纠正，避免下次回退读到旧的。
+- **降级**：非 CEP 环境（浏览器预览 `hasNode=false`）`cfgFilePath()` 返回空串，自动退回纯 `localStorage`，**行为与 1.7.4 完全一致**。
+- 存的是**同一份规范化 JSON**，两个通道内容一致，不引入第二套 schema，`Settings.parse` 的归一化能力继续生效。
+
+### 测试
+
+新增 `tests/settings-persist.test.js`（**28 项**），关键是**不抄一份实现来测**——
+它从 `main.js` 里把真实的 `loadCfg` / `saveCfg` / `cfgFilePath` 抠出来，用 `new Function` 配假 fs / 假 localStorage 真跑：
+
+- **模拟进程重启**：第一个进程设为 `black` 存盘 → 第二个进程带着文件、`localStorage` 却是**旧值**启动 → 必须读到 `black`（这条就是本次 bug 的回归守卫）；
+- `localStorage` 完全丢失（模拟 CEF 清了 profile）→ 主题、提醒间隔、`holdMin` 仍从文件救回；
+- 老版本升级：只有 `localStorage` 时能读出来并迁移进文件；
+- 文件损坏不崩、写盘失败不阻断（`localStorage` 兜住）、`localStorage` 失败不阻断（文件兜住）；
+- 无 Node 时退回纯 `localStorage` 且**不产生文件**。
+
+测试：**19 组 1052 项**（原 18 组 1024 + 新增 28）。文档计数与行数引用同步更新，
+`wiring.test.js` 的 [18] 组是真跑每个测试文件再对表的，所以组数/合计/行数改动它都会响 —— 这次全绿。
+
+> 写这份测试时踩了一个自己的坑：第一版把 `CFG_KEY` 漏在 `new Function` 参数表外，
+> 于是所有 `localStorage` 访问都抛 `ReferenceError`、又被源码里的 `try/catch` 静默吞掉，
+> 表现为「文件通道全过、localStorage 全挂」。**`catch {}` 会把测试的错也一起吞掉** ——
+> 这正是原项目在 `.bat` 那条坑里记过的同一类问题。
+
 ## 1.7.4 — 2026-10-26
 
 按用户给的三张真机截图改两处（都改的是小窗）：
