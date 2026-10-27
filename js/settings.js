@@ -52,6 +52,9 @@
     crashGuard: {
       on: true,              // 崩溃前自动保存总开关
       autoSave: true,        // true=写入原工程；false=只提示不动手
+      // 保存成功时要不要弹提示（1.7.7）。默认关：成功这件事本身不需要打断人。
+      // 失败永远会弹 —— 「以为被保护着其实没有」比被打断危险得多。
+      notify: false,
       holdMin: 10,           // 有改动最多积压多少分钟
       riskSave: 60,          // 风险分数达到此值立即保存
       cooldownMin: 2,        // 两次自动保存的最小间隔
@@ -149,6 +152,7 @@
     crashGuard: {
       on:          { type: 'bool' },
       autoSave:    { type: 'bool' },
+      notify:      { type: 'bool' },
       holdMin:     { type: 'num', lo: 1,   hi: 120 },
       riskSave:    { type: 'num', lo: 40,  hi: 100 },
       cooldownMin: { type: 'num', lo: 1,   hi: 60 },

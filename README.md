@@ -246,7 +246,7 @@ console.log(AE.loadAutoSavePrefs());  // AE 自带自动保存的间隔与目录
 console.log(AE.resolveCacheDir(...)); // 真实缓存目录
 ```
 
-当前状态：`tests/` 下有十九组回归测试，共 **1063 项**断言全绿；换一台没装 AE 的机器跑（如 CI runner），数字完全一致。
+当前状态：`tests/` 下有十九组回归测试，共 **1072 项**断言全绿；换一台没装 AE 的机器跑（如 CI runner），数字完全一致。
 
 其中第 18 组 `ui-interaction.test.js` 会用纯 Node 造一个最小 DOM，**真的去点提示框上的按钮** ——
 因为 1.5.0 出现过「按钮渲染得出来却永远点不动」而当时 660 项断言全绿的 bug（CSS 的 `pointer-events` 没恢复）。1.6.0 已修；
@@ -326,7 +326,7 @@ CEP 内置的 Node 版本随 AE / Premiere 版本变化，老版本可能没有 
 Windows 的 `cmd.exe` 解析 **LF-only** 的批处理会串行：脚本一闪而过、
 报"命令语法不正确"，甚至把 `Installer` 拆成 `taller` 这种怪错。
 
-1063 项测试**从不执行 `.bat`**，所以这个问题在测试里完全不可见，只在双击安装时才炸。
+1072 项测试**从不执行 `.bat`**，所以这个问题在测试里完全不可见，只在双击安装时才炸。
 
 - 仓库里有 `.gitattributes` 声明 `*.bat text eol=crlf`，正常克隆会得到 CRLF。
 - 但 **GitHub 的「Download ZIP」不做 eol 转换**，从网页下载的源码包里 `.bat` 仍是 LF。

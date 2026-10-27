@@ -77,6 +77,15 @@ ok('坏 JSON 回默认', S.parse('{oops').reminders.water.everyMin === 45);
 ok('空串回默认', S.parse('').autoCollapse === true);
 
 /* ---------- [N] 回退副本目录（1.6.4）：只清理语义，不判合法性 ---------- */
+console.log('\n[新] crashGuard.notify 默认静默（1.7.7）');
+{
+  const d = S.normalize({});
+  ok('默认不弹提示', d.crashGuard.notify === false, d.crashGuard.notify);
+  ok('可以自己打开', S.normalize({ crashGuard: { notify: true } }).crashGuard.notify === true);
+  ok('脏值退回默认（静默）',
+     S.normalize({ crashGuard: { notify: 'yes' } }).crashGuard.notify === false);
+}
+
 console.log('\n[新] crashGuard.backupDir 归一化');
 {
   const d = S.defaults();

@@ -52,7 +52,7 @@ console.log('\n[5] 关键结构齐备');
  'remindBar', 'rmIco', 'rmTitle', 'rmMsg', 'rmSnooze', 'rmOk',
  'btnCompact', 'btnCfg', 'kMargin',
  'gdLevel', 'gdState', 'gdBar', 'gdReason', 'gdAeSave',
- 'cbGuard', 'cbGuardWrite', 'inGuardHold', 'inGuardRisk', 'inGuardCool',
+ 'cbGuard', 'cbGuardWrite', 'cbGuardNotify', 'inGuardHold', 'inGuardRisk', 'inGuardCool',
  'cacheRate', 'renderBadge'].forEach(id => {
   ok('存在 #' + id, ids.has(id));
 });
@@ -703,6 +703,30 @@ console.log('\n[17] 版本一致性（VERSION 是唯一事实源）');
  * 子进程**真跑一遍**再逐行比对；另加一条「各行相加 == 表内合计 == 实测总数」。
  * 代价是 [18] 组要花几秒跑子进程 —— 换来的是这类漂移不再只能靠人肉算术发现。
  * ============================================================ */
+console.log('\n[新] 自动保存的「说不说」与「存不存」分离（1.7.7）');
+{
+  const i0 = mainJs.indexOf('function doSave(why)');
+  const i1 = mainJs.indexOf('function localDataDir()');
+  ok('能定位到 doSave 函数体', i0 > 0 && i1 > i0);
+  const saveBlock = mainJs.slice(i0, i1);
+
+  /* 这一条同时钉住两件事，少一半就没意义：
+       成功那条 toast 必须在 if (guardNotify()) 里面（否则又变成每次保存都弹）；
+       失败那条必须在 else 里（否则静默失败 = 以为被保护着其实没有）。 */
+  ok('成功提示可静默，失败提示永远弹',
+     /if \(guardNotify\(\)\) \{[\s\S]{0,400}?toast\('已自动保存工程[\s\S]{0,700}?\} else \{[\s\S]{0,300}?toast\('自动保存失败/
+       .test(saveBlock));
+
+  /* 1.7.6 的主题就是这么丢的：只把对象的一半重建一遍，没列到的字段被默认值覆盖。
+     切档位走 mergeGuardCfg，它必须把 notify 原样带走。 */
+  ok('mergeGuardCfg 把 notify 原样带走', /notify: g\.notify,/.test(mainJs));
+  ok('抽屉里 notify 可读可写',
+     ids.has('cbGuardNotify') && /\$\('cbGuardNotify'\)\.checked/.test(mainJs));
+  ok('settings 的 DEFAULTS 与 SCHEMA 都登记了 notify',
+     /notify: false,/.test(read('js/settings.js')) &&
+     /notify:      \{ type: 'bool' \}/.test(read('js/settings.js')));
+}
+
 console.log('\n[18] 文档测试计数与实测一致');
 {
   const report = read('PLUGIN-REPORT.md');
@@ -719,7 +743,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 298;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 304;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -765,10 +789,10 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「19 组、1057 项断言」',
-     /19 组、\*\*1063 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1057/1057（不是旧数）',
-     /必须 1063\/1063/.test(report));
+  ok('PLUGIN-REPORT 声明「19 组、1072 项断言」',
+     /19 组、\*\*1072 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1072/1072（不是旧数）',
+     /必须 1072\/1072/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
@@ -777,7 +801,7 @@ console.log('\n[18] 文档测试计数与实测一致');
   ok('CHANGELOG 的 1.7.2 / 1.7.3 / 1.7.4 条目写对了计数',
      /## 1\.7\.2[\s\S]*?1016 项/.test(changelog) && /## 1\.7\.3[\s\S]*?1018 项/.test(changelog) &&
      /## 1\.7\.4[\s\S]*?1024 项/.test(changelog));
-  ok('README 写 1063 项', /1063 项/.test(readme));
+  ok('README 写 1072 项', /1072 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

@@ -1539,6 +1539,16 @@
     if (r.shouldSave) doSave(r.why);
   }
 
+  /* 保存成功时要不要弹提示（1.7.7）。
+     默认静默的理由：成功保存不需要已知会 —— 它不改变用户该做什么，
+     却会把注意力从工程上拽走。而崩溃保护真正的验收方式是面板上那行
+     「上次保护保存 hh:mm:ss」和 saves.log，不是一条 2.6 秒就消失的 toast。
+
+     失败那条不在这里管：它必须永远弹（见 doSave 的 else 分支）。 */
+  function guardNotify() {
+    return !!(USR && USR.crashGuard && USR.crashGuard.notify);
+  }
+
   function doSave(why) {
     if (!hasCEP || guardBusy) return;
 
@@ -1567,9 +1577,11 @@
         // 立即把本地状态改成「干净」，否则下一轮可能用旧读数再次触发
         ST.proj.d = (o.d === 1 || o.d === 0) ? o.d : 0;
         if (o.r) ST.proj.rev = o.r;
-        toast('已自动保存工程' + (why === 'risk' ? '（风险升高）' : '（改动已积压）') +
-          (ST.guard.backupErr ? ' · 本次未留回退副本：' + ST.guard.backupErr : ''),
-          ST.guard.lastBackup ? { label: '取回上一版', run: restoreLatest } : null);
+        if (guardNotify()) {
+          toast('已自动保存工程' + (why === 'risk' ? '（风险升高）' : '（改动已积压）') +
+            (ST.guard.backupErr ? ' · 本次未留回退副本：' + ST.guard.backupErr : ''),
+            ST.guard.lastBackup ? { label: '取回上一版', run: restoreLatest } : null);
+        }
         renderAE();
         logSave(true, why, ST.guard.saveMs, '', ST.projectPath);
       } else {
@@ -2940,6 +2952,7 @@
     var cg = USR.crashGuard;
     $('cbGuard').checked = !!cg.on;
     $('cbGuardWrite').checked = !!cg.autoSave;
+    if ($('cbGuardNotify')) $('cbGuardNotify').checked = !!cg.notify;
     $('inGuardHold').value = cg.holdMin;
     $('inGuardRisk').value = cg.riskSave;
     $('inGuardCool').value = cg.cooldownMin;
@@ -3013,7 +3026,8 @@
     if (!Settings || !USR) return;
     var g = USR.crashGuard || {};
     var ng = {
-      on: g.on, autoSave: g.autoSave, holdMin: g.holdMin, riskSave: g.riskSave,
+      on: g.on, autoSave: g.autoSave, notify: g.notify,
+      holdMin: g.holdMin, riskSave: g.riskSave,
       cooldownMin: g.cooldownMin, log: g.log, mode: g.mode, detectedAt: g.detectedAt,
       backup: g.backup, keepBackups: g.keepBackups, backupDir: g.backupDir
     };
@@ -3091,6 +3105,7 @@
       crashGuard: {
         on: $('cbGuard').checked,
         autoSave: $('cbGuardWrite').checked,
+        notify: $('cbGuardNotify') ? $('cbGuardNotify').checked : USR.crashGuard.notify,
         holdMin: $('inGuardHold').value,
         riskSave: $('inGuardRisk').value,
         cooldownMin: $('inGuardCool').value,
