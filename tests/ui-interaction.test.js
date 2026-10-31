@@ -470,5 +470,54 @@ console.log('\n[新 14] 面板主题：把 main.js 里那段主题代码抠出�
   ok('设置里没有主题时落到默认薄荷绿', bodyStub.attrs['data-theme'] === 'mint', bodyStub.attrs['data-theme']);
 }
 
+/* [新 15] 清理缓存：一次点击 / 安全模式两次点击（1.7.10） */
+{
+  const mj = read('js/main.js');
+  const p0 = mj.indexOf('var PURGE_ARM_MS');
+  const p1 = mj.indexOf('function doPurge() {', p0);
+  const src = (p0 >= 0 && p1 > p0) ? mj.slice(p0, p1) : '';
+  ok('[新 15] 能抠出清理缓存的交互段', src.length > 400, src.length);
+
+  function mk(userCfg) {
+    let calls = 0;
+    const cls = { armed: false, add(c) { if (c === 'armed') this.armed = true; }, remove(c) { if (c === 'armed') this.armed = false; } };
+    const btn = { title: '', classList: cls };
+    const ctx = {
+      $: () => btn,
+      toast: () => {},
+      hasCEP: true,
+      ST: { proj: { rq: 0 } },
+      USR: { ui: userCfg },
+      doPurge: () => { calls++; },
+      setTimeout: (fn, ms) => 0,
+      clearTimeout: () => {},
+      fmtBytes: n => String(n)
+    };
+    const fn = new Function('$', 'toast', 'hasCEP', 'ST', 'USR', 'doPurge', 'setTimeout', 'clearTimeout', 'fmtBytes',
+      src + '\nreturn { requestPurge: requestPurge, purgeBlocked: purgeBlocked, purgeArmed: purgeArmed, markPurge: markPurge };');
+    return { api: fn(ctx.$ , ctx.toast, ctx.hasCEP, ctx.ST, ctx.USR, ctx.doPurge, ctx.setTimeout, ctx.clearTimeout, ctx.fmtBytes), btn, calls: () => calls };
+  }
+
+  const once = mk({ purgeConfirm: false });
+  once.api.requestPurge();
+  ok('[新 15] 关掉安全模式：点一次就真清', once.calls() === 1, once.calls());
+
+  const safe = mk({ purgeConfirm: true });
+  safe.api.requestPurge();
+  ok('[新 15] 开安全模式：第一次点击只进入待确认（不清）', safe.calls() === 0, safe.calls());
+  ok('[新 15] 待确认态给按钮加 .armed（转琥珀色）', safe.btn.classList.armed === true);
+  safe.api.requestPurge();
+  ok('[新 15] 第二次点击才真清', safe.calls() === 1, safe.calls());
+  ok('[新 15] 清完把 .armed 撤掉', safe.btn.classList.armed === false);
+
+  const busy = mk({ purgeConfirm: false });
+  busy.api.ST = null;
+  const blocked = (function () {
+    const mj2 = read('js/main.js');
+    return /if \(ST\.proj && ST\.proj\.rq === 1\) return 'render';/.test(mj2);
+  })();
+  ok('[新 15] 渲染中仍然拒绝（安全边界不因模式改变）', blocked);
+}
+
 console.log(`\n===== ${pass} 通过, ${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);

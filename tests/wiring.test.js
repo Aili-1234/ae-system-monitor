@@ -455,7 +455,7 @@ ok('四个主题函数与两个控件都还在（换主题清单不该顺手改�
 ok('小窗两格的 DOM 结构没变（只改 CSS 方向：图标+标签一行、数值下一行）',
    /class="ms-h"/.test(htmlCode) && /<b id="mv1">/.test(htmlCode) && /<b id="mv2">/.test(htmlCode));
 
-console.log('\n[8k] 请 AE 清理磁盘缓存（1.7.8 / 1.7.9 改一次点击）');
+console.log('\n[8k] 请 AE 清理磁盘缓存（1.7.8 · 1.7.9 一次点击 · 1.7.10 安全模式可选）');
 {
   ok('面板里有清理按钮 #btnPurge', html.indexOf('id="btnPurge"') >= 0);
   ok('极简小窗里有清理按钮 #miniPurge', html.indexOf('id="miniPurge"') >= 0);
@@ -475,17 +475,27 @@ console.log('\n[8k] 请 AE 清理磁盘缓存（1.7.8 / 1.7.9 改一次点击）
     purgeBlock.length > 200 && !/rmSync|unlinkSync|unlink\(|copyFile/.test(purgeBlock));
   ok('渲染中拒绝清理（不打扰宿主）', /渲染中不清理/.test(mainJs));
   ok('没有 AE 时也拒绝并说明', /没有 AE，清理缓存不可用/.test(mainJs));
-  ok('一次点击就执行（不再有二次确认残留）',
-    !/PURGE_ARM_MS/.test(mainJs) && !/purgeArmed\(/.test(mainJs) &&
-    !/markPurge\(/.test(mainJs) && css.indexOf('.ibtn.armed') < 0);
+  ok('默认一次点击：配置项 purgeConfirm 默认 false',
+    /purgeConfirm: false/.test(settings) &&
+    /purgeConfirm: \{ type: 'bool' \}/.test(settings));
+  ok('安全模式可选：需要确认时才进待确认态',
+    /function purgeNeedsConfirm\(/.test(mainJs) &&
+    /if \(!purgeNeedsConfirm\(\)\) \{ doPurge\(\); return; \}/.test(mainJs) &&
+    /PURGE_ARM_MS = 4000/.test(mainJs) && /function purgeArmed\(/.test(mainJs) &&
+    /function markPurge\(/.test(mainJs));
+  ok('待确认态有琥珀色提示（CSS .ibtn.armed）',
+    /\.ibtn\.armed \{[^}]*color: var\(--warn\)/.test(css.replace(/\r\n/g, '\n')));
+  ok('抽屉里有「清理缓存要确认」开关',
+    /id="cbPurgeSafe"/.test(html) && /for="cbPurgeSafe"/.test(html) &&
+    /USR\.ui\.purgeConfirm/.test(mainJs));
   ok('清完要作废旧读数并重扫（AE 清理是异步的）',
     /ST\.cache\.scanned = 0/.test(mainJs) && /scanCache\(true\)/.test(mainJs));
   var hostSrc = read('jsx/host.jsx');
   ok('host.jsx 用 AE 自己的菜单命令清缓存',
     /function sysmon_purge\(/.test(hostSrc) &&
     /findMenuCommandId/.test(hostSrc) && /executeCommand/.test(hostSrc));
-  ok('CSS 里有图标样式（带确认态的 armed 已删）',
-    /\.ibtn \.g \{/.test(css) && css.indexOf('.ibtn.armed') < 0);
+  ok('CSS 里有图标样式与待确认态样式',
+    /\.ibtn \.g \{/.test(css) && /\.ibtn\.armed \{/.test(css));
 }
 
 ok('MinSize 宽度 <= 120', /<Width>(\d+)<\/Width>/.test(manifest) &&
@@ -775,7 +785,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 317;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 320;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -821,10 +831,10 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「19 组、1089 项断言」',
-     /19 组、\*\*1089 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1089/1089（不是旧数）',
-     /必须 1089\/1089/.test(report));
+  ok('PLUGIN-REPORT 声明「19 组、1099 项断言」',
+     /19 组、\*\*1099 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1099/1099（不是旧数）',
+     /必须 1099\/1099/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
@@ -834,8 +844,9 @@ console.log('\n[18] 文档测试计数与实测一致');
      /## 1\.7\.2[\s\S]*?1016 项/.test(changelog) && /## 1\.7\.3[\s\S]*?1018 项/.test(changelog) &&
      /## 1\.7\.4[\s\S]*?1024 项/.test(changelog) &&
      /## 1\.7\.8[\s\S]*?1089 项/.test(changelog) &&
-     /## 1\.7\.9[\s\S]*?1089 项/.test(changelog));
-  ok('README 写 1089 项', /1089 项/.test(readme));
+     /## 1\.7\.9[\s\S]*?1089 项/.test(changelog) &&
+     /## 1\.7\.10[\s\S]*?1099 项/.test(changelog));
+  ok('README 写 1099 项', /1099 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

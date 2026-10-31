@@ -570,22 +570,62 @@
     setTimeout(function () { finish(null); }, wait);
   }
 
-  /* ---------------- 请 AE 清理磁盘缓存（1.7.8） ---------------- */
+  /* ---------------- 请 AE 清理磁盘缓存（1.7.8；1.7.10 起安全模式可选） ---------------- */
   // 面板一个文件都不删：AE 的缓存目录里有它自己的账本，外部删文件会让账本对不上。
   // 这里只调 AE 的菜单命令（jsx/host.jsx 的 sysmon_purge），让 AE 自己清自己的。
-  // 一次点击直接执行（不再二次确认）。渲染中与无宿主仍然拒绝 ——
-  // 这两条是安全边界（清到一半会打断渲染），不是确认步骤。
+  // 默认点一次就执行；设置里打开「清理缓存要确认」后要连点两次（4 秒内）。
+  // 渲染中与无宿主一律拒绝 —— 那是安全边界（清到一半会打断渲染），不是确认步骤。
+  var PURGE_ARM_MS = 4000;
+  var purgeArmTimer = null;
+  // 待确认态用独立标记，不拿 setTimeout 的返回值当状态：
+  // 返回值域依赖宿主（有的实现从 0 起，0 是假值，第二次点击会被误判成「还没武装」）。
+  var purgeArming = false;
+
   function purgeBlocked() {
     if (!hasCEP) return 'nohost';
     if (ST.proj && ST.proj.rq === 1) return 'render';
     return '';
   }
 
+  function purgeArmed() { return purgeArming; }
+
+  /* 待确认态：两颗按钮一起转琥珀色（面板里那颗、极简里那颗） */
+  function markPurge(on) {
+    var ids = ['btnPurge', 'miniPurge'];
+    for (var i = 0; i < ids.length; i++) {
+      var b = $(ids[i]);
+      if (!b) continue;
+      if (on) b.classList.add('armed'); else b.classList.remove('armed');
+      b.title = on
+        ? '再点一次就清理磁盘缓存'
+        : '请 AE 清理磁盘缓存（走 AE 自己的清理命令，不删文件）';
+    }
+  }
+
+  function purgeNeedsConfirm() {
+    return !!(USR && USR.ui && USR.ui.purgeConfirm);
+  }
+
   function requestPurge() {
     var why = purgeBlocked();
     if (why === 'nohost') { toast('这套环境里没有 AE，清理缓存不可用'); return; }
     if (why === 'render') { toast('渲染中不清理：AE 主线程被占死，清到一半会打断渲染'); return; }
-    doPurge();
+
+    // 不走安全模式：点一次就清
+    if (!purgeNeedsConfirm()) { doPurge(); return; }
+
+    // 安全模式：第一次只进入待确认，4 秒内再点一次才真清
+    if (purgeArmed()) {
+      if (purgeArmTimer) { clearTimeout(purgeArmTimer); purgeArmTimer = null; }
+      purgeArming = false;
+      markPurge(false);
+      doPurge();
+      return;
+    }
+    purgeArming = true;
+    markPurge(true);
+    purgeArmTimer = setTimeout(function () { purgeArmTimer = null; purgeArming = false; markPurge(false); }, PURGE_ARM_MS);
+    toast('再点一次就清理缓存（4 秒内）');
   }
 
   function doPurge() {
@@ -2974,6 +3014,7 @@
   function syncDrawer() {
     if (!USR) return;
     $('cbAuto').checked = !!USR.autoCollapse;
+    if ($('cbPurgeSafe')) $('cbPurgeSafe').checked = !!(USR.ui && USR.ui.purgeConfirm);
     if ($('selMetric')) $('selMetric').value = USR.miniMetric;
     if ($('selSub1')) $('selSub1').value = USR.miniSub1 || 'none';
     if ($('selSub2')) $('selSub2').value = USR.miniSub2 || 'none';
@@ -3141,6 +3182,12 @@
 
     USR = normFromUSR({
       autoCollapse: $('cbAuto').checked,
+      // ui 整块要自己带走：只传部分键会把没提到的（cache/mem/disk/guard/theme）丢掉
+      ui: {
+        cache: USR.ui.cache, mem: USR.ui.mem, disk: USR.ui.disk, guard: USR.ui.guard,
+        theme: USR.ui.theme,
+        purgeConfirm: $('cbPurgeSafe') ? !!$('cbPurgeSafe').checked : !!USR.ui.purgeConfirm
+      },
       miniMetric: $('selMetric') ? $('selMetric').value : USR.miniMetric,
       miniSub1: $('selSub1') ? $('selSub1').value : USR.miniSub1,
       miniSub2: $('selSub2') ? $('selSub2').value : USR.miniSub2,

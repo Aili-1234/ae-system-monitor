@@ -1381,6 +1381,11 @@ body:not(.compact) .app { animation: vFade .18s ease; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* 安全模式（1.7.10）：第一次点击后按钮转琥珀色，第二次才真清。
+   注：1.7.9 的补丁只删掉了 .ibtn.armed 的选择器行、把这三行声明留成了孤立块，
+   这里一并补回选择器 —— 孤立声明块是无效 CSS，浏览器会整段丢掉。 */
+.ibtn.armed {
   color: var(--warn);
   border-color: var(--warn);
 }

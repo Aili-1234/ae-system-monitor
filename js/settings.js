@@ -47,7 +47,10 @@
       guard: false,
       // 面板主题（1.7.1）：五套深色主题，只换强调色系。放 ui 里是为了跟着
       // main.js 里那句「ui: USR.ui」原样带走，不必在 7 处白名单里各补一行。
-      theme: 'mint'
+      theme: 'mint',
+      // 清理缓存的安全模式（1.7.10）：默认 false = 点一次就清；打开后要连点两次
+      // （4 秒内），第一次点击按钮只转琥珀色。放 ui 里跟其它界面偏好一处管。
+      purgeConfirm: false
     },
     crashGuard: {
       on: true,              // 崩溃前自动保存总开关
@@ -147,7 +150,8 @@
       guard: { type: 'bool' },
       // alias：1.7.4 把「象牙白 ivory」改名成「白粉 pinkwhite」，老值先翻译再校验，
       // 否则升级后小窗会静默跳回薄荷绿（用户自己选的主题不该被一次改名吃掉）
-      theme: { type: 'enum', values: THEMES, def: 'mint', alias: { ivory: 'pinkwhite' } }
+      theme: { type: 'enum', values: THEMES, def: 'mint', alias: { ivory: 'pinkwhite' } },
+      purgeConfirm: { type: 'bool' }
     },
     crashGuard: {
       on:          { type: 'bool' },
