@@ -111,5 +111,46 @@ function sysmon_save() {
            '&ms=' + (new Date().getTime() - t0);
 }
 
+/* 1.7.8：请 AE 自己清理磁盘缓存。
+   为什么不在这里删文件：AE 的缓存目录里不只有媒体文件，还有它自己维护的数据库；
+   外部删掉文件等于让 AE 的账本对不上，轻则白占空间、重则下次打开报缓存损坏。
+   官方入口是菜单「编辑 > 清理 > 全部内存和磁盘缓存」，这里只负责点它。
+   返回 ok=1 表示命令发出去了（AE 的清理本身是异步的，成效要过一会儿再看）。 */
+function sysmon_purge() {
+    var t0 = new Date().getTime();
+    var ok = 0, id = 0, err = '';
+
+    // AE 多数版本没有 app.purge，只有菜单命令；先探一下，探不到就只走菜单。
+    try { if (app.purge) { app.purge(); ok = 1; id = -1; } } catch (e0) {
+        err = String(e0 && e0.message ? e0.message : e0);
+    }
+
+    if (!ok) {
+        // 英文/中文两种界面都试一遍：findMenuCommandId 在中文界面下可能只认本地化名字
+        var names = [
+            'Purge>All Memory & Disk Cache',
+            '\u6e05\u7406>\u5168\u90e8\u5185\u5b58\u548c\u78c1\u76d8\u7f13\u5b58'
+        ];
+        var i, mid;
+        for (i = 0; i < names.length && !ok; i++) {
+            try {
+                mid = app.findMenuCommandId(names[i]);
+                if (mid && mid > 0) {
+                    app.executeCommand(mid);
+                    ok = 1;
+                    id = mid;
+                }
+            } catch (e1) {
+                if (!err) err = String(e1 && e1.message ? e1.message : e1);
+            }
+        }
+        if (!ok && !err) err = 'AE 没有"清理 > 全部内存和磁盘缓存"这条命令';
+    }
+
+    return 'ok=' + ok + '&id=' + id +
+           '&err=' + encodeURIComponent(err) +
+           '&ms=' + (new Date().getTime() - t0);
+}
+
 /* CEP 会执行 ScriptPath 指向的文件；这里留一个无副作用的表达式 */
 sysmon_getInfo();

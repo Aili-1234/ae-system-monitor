@@ -1367,3 +1367,21 @@ body:not(.compact) .app { animation: vFade .18s ease; }
   .thm-pop { flex-wrap: wrap; max-width: calc(100vw - 20px); }
 }
 
+/* 1.7.8：清理按钮。图标用内联 SVG（10×10、跟着字色走），因为 .ibtn.sm 只有 17px，
+   放汉字会被挤成两行 —— 1.6.1 的 #btnRemindPreset 就踩过这个坑。
+   .armed 是「再点一次才真清」的待确认态：换成警示色，提示这一下要动缓存。 */
+.ibtn .g {
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin: 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ibtn.armed {
+  color: var(--warn);
+  border-color: var(--warn);
+}

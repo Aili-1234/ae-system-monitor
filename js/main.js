@@ -570,6 +570,79 @@
     setTimeout(function () { finish(null); }, wait);
   }
 
+  /* ---------------- 请 AE 清理磁盘缓存（1.7.8） ---------------- */
+  // 面板一个文件都不删：AE 的缓存目录里有它自己的账本，外部删文件会让账本对不上。
+  // 这里只调 AE 的菜单命令（jsx/host.jsx 的 sysmon_purge），让 AE 自己清自己的。
+  // 两次点击确认：清缓存不可撤销，误触要让 AE 重算一遍。
+  var PURGE_ARM_MS = 4000;
+
+  function purgeBlocked() {
+    if (!hasCEP) return 'nohost';
+    if (ST.proj && ST.proj.rq === 1) return 'render';
+    return '';
+  }
+
+  function purgeArmed() {
+    return !!(ST.purgeArm && (Date.now() - ST.purgeArm) < PURGE_ARM_MS);
+  }
+
+  function markPurge(on) {
+    var ids = ['btnPurge', 'miniPurge'];
+    for (var i = 0; i < ids.length; i++) {
+      var el = $(ids[i]);
+      if (!el) continue;
+      el.className = el.className.replace(/\s*armed/g, '') + (on ? ' armed' : '');
+      el.title = on
+        ? '再点一次：请 AE 清理磁盘缓存'
+        : '请 AE 清理磁盘缓存（走 AE 自己的清理命令，不删文件）';
+    }
+  }
+
+  function requestPurge() {
+    var why = purgeBlocked();
+    if (why === 'nohost') { toast('这套环境里没有 AE，清理缓存不可用'); return; }
+    if (why === 'render') { toast('渲染中不清理：AE 主线程被占死，清到一半会打断渲染'); return; }
+
+    if (purgeArmed()) { ST.purgeArm = 0; doPurge(); return; }
+
+    ST.purgeArm = Date.now();
+    markPurge(true);
+    toast('再点一次「清理」，让 AE 自己清磁盘缓存（面板不删文件）');
+    setTimeout(function () {
+      if (purgeArmed()) return;
+      ST.purgeArm = 0;
+      markPurge(false);
+    }, PURGE_ARM_MS + 60);
+  }
+
+  function doPurge() {
+    markPurge(false);
+    var before = (ST.cache && ST.cache.used) || 0;
+    var done = false;
+
+    function finish(raw) {
+      if (done) return;
+      done = true;
+      var r = parseKV(raw);
+      if (!r || Number(r.ok) !== 1) {
+        var why = (r && r.err) ? String(r.err) : 'AE 没有响应';
+        toast('清理没生效：' + why + '；可以到 AE 菜单「编辑 > 清理」手动清');
+        return;
+      }
+      toast('已请 AE 清理磁盘缓存（清理前 ' + fmtBytes(before) + '），正在重新统计…');
+      // 清理是异步的：等一拍再重扫，否则读到的还是清理前的数
+      setTimeout(function () {
+        if (!ST.cache) return;
+        ST.cache.scanned = 0;
+        scanCache(true).then(function () { renderCache(); renderMini(); });
+      }, 1500);
+    }
+
+    try { window.__adobe_cep__.evalScript('sysmon_purge()', finish); }
+    catch (e) { finish(''); }
+    setTimeout(function () { finish(''); }, 4000);
+  }
+
   /* ---------------- 渲染中静音 ---------------- */
   function renderRenderBadge() {
     var b = $('renderBadge');
@@ -3508,6 +3581,8 @@
     $('miniRing').addEventListener('click', function () { toggleCompact(); });
     $('btnCfg').addEventListener('click', openDrawer);
     $('miniCfg').addEventListener('click', openDrawer);
+    $('miniPurge').addEventListener('click', requestPurge);
+    $('btnPurge').addEventListener('click', requestPurge);
     $('dwClose').addEventListener('click', closeDrawer);
     $('mask').addEventListener('click', closeDrawer);
     $('drawer').addEventListener('change', applyDrawer);

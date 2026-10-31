@@ -455,7 +455,38 @@ ok('四个主题函数与两个控件都还在（换主题清单不该顺手改�
 ok('小窗两格的 DOM 结构没变（只改 CSS 方向：图标+标签一行、数值下一行）',
    /class="ms-h"/.test(htmlCode) && /<b id="mv1">/.test(htmlCode) && /<b id="mv2">/.test(htmlCode));
 
-console.log('\n[9] manifest 允许折叠成窄条 / 版本覆盖');
+console.log('\n[8k] 请 AE 清理磁盘缓存（1.7.8）');
+{
+  ok('面板里有清理按钮 #btnPurge', html.indexOf('id="btnPurge"') >= 0);
+  ok('极简小窗里有清理按钮 #miniPurge', html.indexOf('id="miniPurge"') >= 0);
+  ok('极简的清理按钮在按钮行里（和 ↗ ≡ 同一行）',
+    /<div class="mini-row">[\s\S]{0,400}?id="miniPurge"/.test(html));
+  ok('面板的清理按钮在缓存路径那一行（紧跟 ↗ 打开目录）',
+    /id="btnOpen"[\s\S]{0,320}?id="btnPurge"/.test(html));
+  ok('有 requestPurge / doPurge / purgeBlocked 三个函数',
+    /function requestPurge\(/.test(mainJs) && /function doPurge\(/.test(mainJs) &&
+    /function purgeBlocked\(/.test(mainJs));
+  ok('真清动作是调 JSX 的 sysmon_purge，不是删文件',
+    /evalScript\('sysmon_purge\(\)'/.test(mainJs));
+  var pp0 = mainJs.indexOf('function doPurge() {');
+  var pp1 = mainJs.indexOf('渲染中静音', pp0);
+  var purgeBlock = (pp0 >= 0 && pp1 > pp0) ? mainJs.slice(pp0, pp1) : '';
+  ok('清理函数自己不删文件（删除动作只有 AE 能做）',
+    purgeBlock.length > 200 && !/rmSync|unlinkSync|unlink\(|copyFile/.test(purgeBlock));
+  ok('渲染中拒绝清理（不打扰宿主）', /渲染中不清理/.test(mainJs));
+  ok('没有 AE 时也拒绝并说明', /没有 AE，清理缓存不可用/.test(mainJs));
+  ok('两次点击确认（4 秒窗口）',
+    /PURGE_ARM_MS = 4000/.test(mainJs) && /if \(purgeArmed\(\)\)/.test(mainJs));
+  ok('清完要作废旧读数并重扫（AE 清理是异步的）',
+    /ST\.cache\.scanned = 0/.test(mainJs) && /scanCache\(true\)/.test(mainJs));
+  var hostSrc = read('jsx/host.jsx');
+  ok('host.jsx 用 AE 自己的菜单命令清缓存',
+    /function sysmon_purge\(/.test(hostSrc) &&
+    /findMenuCommandId/.test(hostSrc) && /executeCommand/.test(hostSrc));
+  ok('CSS 里有图标与待确认态样式',
+    /\.ibtn \.g \{/.test(css) && /\.ibtn\.armed \{/.test(css));
+}
+
 ok('MinSize 宽度 <= 120', /<Width>(\d+)<\/Width>/.test(manifest) &&
    (() => { const m = [...manifest.matchAll(/<Width>(\d+)<\/Width>/g)]; const min = Math.min(...m.map(x => +x[1])); return min <= 120; })());
 ok('仍开启 --enable-nodejs', manifest.indexOf('--enable-nodejs') >= 0);
@@ -743,7 +774,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 304;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 317;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -789,19 +820,20 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「19 组、1072 项断言」',
-     /19 组、\*\*1072 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1072/1072（不是旧数）',
-     /必须 1072\/1072/.test(report));
+  ok('PLUGIN-REPORT 声明「19 组、1089 项断言」',
+     /19 组、\*\*1089 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1089/1089（不是旧数）',
+     /必须 1089\/1089/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
   ok('CHANGELOG 的 1.7.1 条目写 1003 项',
      /## 1\.7\.1[\s\S]*?1003 项/.test(changelog));
-  ok('CHANGELOG 的 1.7.2 / 1.7.3 / 1.7.4 条目写对了计数',
+  ok('CHANGELOG 的 1.7.2 / 1.7.3 / 1.7.4 / 1.7.8 条目写对了计数',
      /## 1\.7\.2[\s\S]*?1016 项/.test(changelog) && /## 1\.7\.3[\s\S]*?1018 项/.test(changelog) &&
-     /## 1\.7\.4[\s\S]*?1024 项/.test(changelog));
-  ok('README 写 1072 项', /1072 项/.test(readme));
+     /## 1\.7\.4[\s\S]*?1024 项/.test(changelog) &&
+     /## 1\.7\.8[\s\S]*?1089 项/.test(changelog));
+  ok('README 写 1089 项', /1089 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

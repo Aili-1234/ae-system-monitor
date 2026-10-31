@@ -176,5 +176,30 @@ ok('内联 JSX 不依赖 JSON', inlineJsx.indexOf('JSON') < 0);
 ok('内联 JSX 不使用箭头函数', inlineJsx.indexOf('=>') < 0);
 ok('内联 JSX 不使用 let/const', !/\b(let|const)\s/.test(inlineJsx));
 
+/* ---------- 5. sysmon_purge：用假 app 真跑一遍（属性名打错会在这里露馅） ---------- */
+{
+  const box = new Function('app', 'encodeURIComponent',
+    hostJsx + '\nreturn { purge: sysmon_purge };');
+  const calls = [];
+  const fakeApp = {
+    version: '24.2.1',
+    findMenuCommandId: function (name) {
+      return name === 'Purge>All Memory & Disk Cache' ? 4242 : 0;
+    },
+    executeCommand: function (id) { calls.push(id); return true; }
+  };
+  const api = box(fakeApp, encodeURIComponent);
+  const r1 = parseKV(api.purge());
+  ok('找到清理菜单并执行', r1 && r1.ok === 1 && calls[0] === 4242, JSON.stringify(r1));
+  ok('回报菜单 id（不用猜哪个名字命中了）', r1 && r1.id === 4242, r1 && r1.id);
+  ok('耗时是数字毫秒', r1 && typeof r1.ms === 'number' && r1.ms >= 0, r1 && r1.ms);
+
+  const bare = { version: '24.2.1' };
+  const api2 = box(bare, encodeURIComponent);
+  const r2 = parseKV(api2.purge());
+  ok('没有清理入口时 ok=0 且带原因', r2 && r2.ok === 0 && String(r2.err).length > 0,
+    r2 && r2.err);
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

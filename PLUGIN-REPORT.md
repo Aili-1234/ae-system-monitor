@@ -4,15 +4,15 @@
 |---|---|
 | 名称 | System Monitor for After Effects（AE 系统监视器） |
 | 类型 | Adobe CEP 扩展（停靠面板，内置在 AE 内） |
-| 版本 | 1.7.4 |
+| 版本 | 1.7.8 |
 | Bundle ID | `com.sysmon.ae.panel` |
 | 宿主 | After Effects 2018 (15.0) ~ 2026+（manifest：`AEFT [15.0,99.9]` + `CSXS 8.0`） |
 | 运行环境 | Windows（磁盘优先 `fs.statfsSync`，降级 PowerShell CIM；macOS 走 `statfs`/`df`） |
 | 安装位置 | `%APPDATA%\Adobe\CEP\extensions\AESystemMonitor` |
 | 实测环境 | Windows / AE 24.2 / Node 22（面板侧） |
-| 测试规模 | 19 组、**1072 项**断言；本机与"无 AE 环境"跑出**完全相同的数字**（`node tests/*.test.js`） |
+| 测试规模 | 19 组、**1089 项**断言；本机与"无 AE 环境"跑出**完全相同的数字**（`node tests/*.test.js`） |
 | 交付状态 | 已安装，安装副本与源码 11 个文件逐字节一致 |
-| 报告日期 | 2026-10-26（v23，1.7.4：小窗两格数值改回**标签下面**（用户给了三张真机截图，图一/图二/图三统一成一种排法，窄面板不再省略截断）、主题删掉灰色并把「象牙白」改名「白粉」（底色更白 `#fffafc`、文字转粉 `#a83a63`，旧值 `ivory` 自动迁移）；1.7.3：修小窗圆环的底衬 —— `<button>` 去掉 `conic-gradient` 后 UA 默认背景露白（这正是「太亮」的根源），现显式透明、外圈轨道换回 `--line`；1.7.2：小窗圆环改**双层环**（外圈只留更暗的轨道、进度画在内圈）、图标全改**实心**并去掉深蓝描边（颜色只跟主题走）、两格数值挪到标签**同一行**（窄档回到标签下面）、切换加**淡入淡出**而拖动仍零补间、主题 5→**8 套**（新增象牙白 / 雾蓝浅两套浅色底 + **黑色适配 AE 原生深色 UI**）；1.7.1：小窗图标换成层叠横条（三片错开、长度递减，避开与设置 ≡ 撞脸）、图标色降到 #6e6e6e 并加一圈深蓝边缘描边、小窗几何改成连续跟随（无过渡）、**新增 5 套面板主题**（薄荷绿/天青蓝/藕紫/灰色/淡粉，顶部色点与抽屉一行两处联动）；1.7.0：老 AE 兼容（下界回到 AE 2018）、修缩放延迟、小窗矮则横排；1.6.6：修小窗单位错（142 GB 显示成 142B），并把次显示改成浅显说法（「缓存上限」+ 词语指标「盘够装吗」）；1.6.5：极简小窗的主显示与两格次显示都能自己选、重复的自动留空；1.6.4：小窗占用行整组居中 + 图标、回退副本落点可改、补发 1.6.3 审计的 P0 修复；1.6.2：回退副本逐份取回、小窗占用行；1.6.1：提示框回到面板内且按钮可点、首屏视图可选、两种模式的提醒优化；已推送 GitHub） |
+| 报告日期 | 2026-10-26（v24，**1.7.8：加了「清理缓存」按钮** —— 面板缓存卡里一个、极简小窗按钮行里一个；**面板不删文件**，只调 AE 自己的「编辑 > 清理 > 全部内存和磁盘缓存」（`jsx/host.jsx` 的 `sysmon_purge()` 走 `findMenuCommandId` + `executeCommand`），两次点击确认、渲染中与无 AE 时拒绝、清完自动重扫；1.7.4：小窗两格数值改回**标签下面**（用户给了三张真机截图，图一/图二/图三统一成一种排法，窄面板不再省略截断）、主题删掉灰色并把「象牙白」改名「白粉」（底色更白 `#fffafc`、文字转粉 `#a83a63`，旧值 `ivory` 自动迁移）；1.7.3：修小窗圆环的底衬 —— `<button>` 去掉 `conic-gradient` 后 UA 默认背景露白（这正是「太亮」的根源），现显式透明、外圈轨道换回 `--line`；1.7.2：小窗圆环改**双层环**（外圈只留更暗的轨道、进度画在内圈）、图标全改**实心**并去掉深蓝描边（颜色只跟主题走）、两格数值挪到标签**同一行**（窄档回到标签下面）、切换加**淡入淡出**而拖动仍零补间、主题 5→**8 套**（新增象牙白 / 雾蓝浅两套浅色底 + **黑色适配 AE 原生深色 UI**）；1.7.1：小窗图标换成层叠横条（三片错开、长度递减，避开与设置 ≡ 撞脸）、图标色降到 #6e6e6e 并加一圈深蓝边缘描边、小窗几何改成连续跟随（无过渡）、**新增 5 套面板主题**（薄荷绿/天青蓝/藕紫/灰色/淡粉，顶部色点与抽屉一行两处联动）；1.7.0：老 AE 兼容（下界回到 AE 2018）、修缩放延迟、小窗矮则横排；1.6.6：修小窗单位错（142 GB 显示成 142B），并把次显示改成浅显说法（「缓存上限」+ 词语指标「盘够装吗」）；1.6.5：极简小窗的主显示与两格次显示都能自己选、重复的自动留空；1.6.4：小窗占用行整组居中 + 图标、回退副本落点可改、补发 1.6.3 审计的 P0 修复；1.6.2：回退副本逐份取回、小窗占用行；1.6.1：提示框回到面板内且按钮可点、首屏视图可选、两种模式的提醒优化；已推送 GitHub） |
 
 ---
 
@@ -514,17 +514,17 @@ manifest 声明：`AEFT [15.0, 99.9]` + `CSXS 8.0`（**最低 AE 2018**）。1.6
 | `trend.test.js` | 40 | 增速估算、窗口裁剪、缓存回落、样本不足不给结论、ETA 格式化 |
 | `trend-margin.test.js` | 41 | **双字段采样**：ETA 用余量斜率、缓存斜率只解释成因、老样本退回旧算法 |
 | `autosave.test.js` | 19 | 解析 AE 自带自动保存配置、中文路径解码、最新 .aep 定位（fixture 偏好文件） |
-| `hostjsx.test.js` | 39 | **用假 AE 对象真跑 ExtendScript**，验证属性名与降级 |
+| `hostjsx.test.js` | 43 | **用假 AE 对象真跑 ExtendScript**，验证属性名与降级 |
 | `compat.test.js` | 21 | 四种老版本 Node 环境下的读取与扫描一致性（fixture 缓存树） |
 | `prefs-version.test.js` | 32 | **偏好按运行版本对齐**：精确/降级/全局三级回退、缓存目录 strict 定位 |
 | `crash-history.test.js` | 40 | 从 WER 读崩溃史：UTF-16LE 解码、异常代码翻译、次数与中位间隔、脾气分档 |
 | `guard-modes.test.js` | 46 | **四个档位**：自动推荐规则、预设数值、按档位的崩溃窗口、安静档不进不稳定期 |
-| `wiring.test.js` | 304 | ID 接线、脚本顺序、label 指向、manifest 声明、声音是否彻底移除、**提示框落位与 pointer-events**、**首屏视图接线**、**两种模式的提醒样式**、**带文字按钮禁用方形图标尺寸**、**HTML 不残留 Markdown 星号**、**抽屉行不许硬挤**、**回退列表收起时机与占用行解耦**、**小窗占用行居中与图标**、**回退副本落点可改**、**小窗双层环 / 图标实心跟随主题 / 切换淡入淡出（1.7.2）**、**圆环底衬显式透明（1.7.3）**、**两格数值竖排（不再省略截断）/ 白粉主题（1.7.4）**、**归一化一律走 `normFromUSR`（1.7.6：`main.js` 里一处裸的 `Settings.normalize({...})` 白名单都不许有 —— 手写白名单才是主题丢失的根因形状，不是漏了某个键）、小窗形态可记忆且自动折叠不污染它**、**自动保存「说不说」与「存不存」分离（1.7.7：成功可静默、失败那条永远弹）** |
+| `wiring.test.js` | 317 | ID 接线、脚本顺序、label 指向、manifest 声明、声音是否彻底移除、**提示框落位与 pointer-events**、**首屏视图接线**、**两种模式的提醒样式**、**带文字按钮禁用方形图标尺寸**、**HTML 不残留 Markdown 星号**、**抽屉行不许硬挤**、**回退列表收起时机与占用行解耦**、**小窗占用行居中与图标**、**回退副本落点可改**、**小窗双层环 / 图标实心跟随主题 / 切换淡入淡出（1.7.2）**、**圆环底衬显式透明（1.7.3）**、**两格数值竖排（不再省略截断）/ 白粉主题（1.7.4）**、**归一化一律走 `normFromUSR`（1.7.6：`main.js` 里一处裸的 `Settings.normalize({...})` 白名单都不许有 —— 手写白名单才是主题丢失的根因形状，不是漏了某个键）、小窗形态可记忆且自动折叠不污染它**、**自动保存「说不说」与「存不存」分离（1.7.7：成功可静默、失败那条永远弹）** |
 | `optimize.test.js` | 57 | 上限与日志开关进 schema、其他版本缓存枚举、降频/降级路径未被退回 |
 | `backup.test.js` | 66 | **回退副本**：命名/哈希分夹/轮转保留份数/挑最新、**毫秒时间戳**、**撞名兜底**、**原子落盘（含假 fs 注入的三类写失败）**、覆盖优先语义 |
 | `ui-interaction.test.js` | 66 | **用纯 Node 造的最小 DOM 真的点按钮**：提示框落在面板内、动作按钮可点并触发回调、点空白即消失、同屏上限 3 条、首屏视图三态、极简模式按钮仍在框内、**刷新闸门不被异常钉死（P0：把 refreshFail / guardRefresh / refresh 从 main.js 抠出来真跑）** |
 | `settings-persist.test.js` | 28 | **设置持久化（1.7.5 新增；注意 1.7.5 对真机那条 bug 的定案已被 1.7.6 推翻 —— 见 CHANGELOG 1.7.6）**：从 main.js 抠出真实的 `loadCfg` / `saveCfg` / `cfgFilePath` 用 `new Function` 真跑；文件优先于 localStorage、**模拟进程重启后从文件读回设置**（CEP 退出丢 localStorage 的核心场景）、localStorage 全丢仍能救回、老版本从 localStorage 迁移进文件、坏文件不崩、写盘失败与 localStorage 失败都不阻断、无 Node 时退回纯 localStorage、两通道自动对齐 |
-| **合计** | **1072** | |
+| **合计** | **1089** | |
 
 ### 7.2 四类特别值得说的测试
 
@@ -582,15 +582,15 @@ ExtendScript 里属性名打错（`dirty` 写成 `isDirty`）不会报语法错�
 for f in tests/*.test.js; do printf '%-28s' "$f"; node "$f" | tail -1; done
 ```
 
-期望逐项通过数（19 组、合计 **1072**，失败数一律为 0）：
+期望逐项通过数（19 组、合计 **1089**，失败数一律为 0）：
 
 ```
 umd 11            scan 12           settings 94       reminder 65
 guard 50          guard-crash 41    guard-modes 46    trend 40
-trend-margin 41   autosave 19       hostjsx 39        compat 21
-prefs-version 32  crash-history 40  backup 66         wiring 304
+trend-margin 41   autosave 19       hostjsx 43        compat 21
+prefs-version 32  crash-history 40  backup 66         wiring 317
 optimize 57       ui-interaction 66 settings-persist 28
-                                             —— 合计 1072
+                                             —— 合计 1089
 ```
 
 **这条曾经不成立，1.4.4 才成立。** 早先 `scan` / `compat` / `autosave` / `umd` / `optimize` 五组直接读本机真实 AE 偏好，于是「本机全绿、CI 红」同时成立。1.4.4 复用 `tests/_fixture.js`（临时目录里造 `设置.txt`、`*-indep-general.txt`、自动保存目录与缓存树，把 `os.homedir()` / `os.hostname()` 指过去，Windows 与 mac 两种偏好位置都写）把这五组改成 fixture 驱动。修复前后的实测对比见 [7.5](#75-测试与装没装-ae的关系144-已修)。
@@ -725,6 +725,7 @@ node tests/wiring.test.js
 | **1.6.1** | **交互可用性与首屏视图**：①🔴**修 toast 动作按钮点不动的真 bug**（`.toast.show` 补 `pointer-events: auto`）；②提示框从 `position:fixed` 挂 body 改为落在面板内的 `#bottomStack`（宽度=面板宽），不再溢出到面板外；③提示框与提醒条共用底部堆叠容器，不再互相盖住；④**小窗（极简）模式**：提示框与提醒条改竖排、动作按钮占满宽度，窄面板里也点得到；⑤`reminder.js` 新增 `shortMsg`，小窗用短消息，点标题可切换长短；⑥新增设置项「首屏视图」：极简 / 完整 / 沿用上次，改完立即生效；⑦提醒设置区加状态摘要 + 常用间隔一键填入；⑧新增 `tests/ui-interaction.test.js`（纯 Node 最小 DOM，真的点一下按钮）。测试 18 组 789 项 |
 | **1.6.2** | **回退副本可逐份取回 + 小窗占用行**：①「回退副本 N 份 · 最近 …」改成可点开，按时间列出**最近 3 份**（今天只给 `时:分`，更早给 `月-日 时:分`），每行右侧 ↺ 取回该份 —— 取回仍是生成新文件（`<工程名>（回退 时刻）.aep`，撞名自动 -2），不动原工程；面板窄到 150px 以下只留时间列，取回键永不被挤出；②极简（小窗）模式圆环下加占用行：**缓存占用在左、内存占用在右**，沿用同一套阈值取色（85% 黄 / 97% 红）；③新增 `Backup.recent()` / `stampShort()` / `restorePick()` / `renderBackupList()` / `renderMiniStats()`；④版面自检从 280px 扩到 **96px**（manifest 最小尺寸），正常 + 极简两模式 10 组无重叠无溢出。测试 18 组 855 项 |
 | **1.6.4** | **小窗占用行居中 + 图标**：①两列从「各占一半、右列右对齐」改成**整组居中**，间距 `clamp(6px, 8vw, 16px)` 随面板宽度收缩（200px → 16px，96px → 6px）；②缓存 / 内存各加一个内联 SVG（叠层圆柱 / 带引脚芯片），与数值同一套取色（85% 黄、97% 红）；③`wiring.test.js` 新增 4 条断言（图标、居中、自适应间距、图标随色）。**回退副本落点可改**：设置里新增「副本目录」，留空＝老行为（工程目录旁），填了就在该目录下再套一层同名容器；**目录不可用时退回默认位置并出声**，改落点后默认位置里的老副本仍列出、每份标注来源并可逐份取回；`settings.js` 新增 `normStr` + `backupDir`，`js/backup.js` 新增纯函数 `pickRoot`（6 条单测）。**补发 1.6.3 审计的 P0 修复**：刷新链前置段抛异常会让 `ST.busy` 永久为真（面板停更、点 ⟳ 也进不去，只能重载），改为 `guardRefresh` / `refreshFail`，并补 7 条行为测试真跑这两个函数。测试 18 组 899 项 |
+| **1.7.8** | **清理缓存按钮（面板 + 极简小窗）**：用户要「再加一个清理缓存的按钮，要在极简界面也有」。**面板不删文件** —— AE 的缓存目录里还有它自己维护的账本，外部删文件会让账本对不上、重则下次打开报缓存损坏；所以只调 AE 自己的菜单命令：`jsx/host.jsx` 的 `sysmon_purge()` 用 `app.findMenuCommandId('Purge>All Memory & Disk Cache')` + `app.executeCommand(id)`（中英文界面各试一次，失败时回报具体原因，绝不假装成功）。UX 三条：**两次点击确认**（4 秒窗口、按钮转警示色）、**渲染中拒绝**（主线程被占死，清到一半会打断渲染）、**没有 AE 时拒绝**；清完把 `ST.cache.scanned` 置零并重扫（AE 的清理是异步的，立刻读还是旧数）。测试 19 组 1089 项 |
 | **1.7.4** | **两格数值竖排 + 白粉主题**（都来自用户三张真机截图）：①两格数值一律排到标签**下面**（原先 1.7.2 挪成同一行，用户看图一说「在每行项目文字的下面更美观」）——竖排后每格只要容纳「标签」与「数值」里较宽的那个，图二那种窄面板上的省略号自然消失（`check_174_ellipsis.py` 在 12 个尺寸上量 `scrollWidth` 逐格验证）；原「≤180px 才竖排」的断点随之删掉，横排档沿用同一种排法；②主题删掉**灰色**（与黑色/薄荷绿太近），「象牙白 ivory」改名**白粉 `pinkwhite`**（底色更白 `#fffafc`、文字转粉 `#a83a63`，WCAG 最差 5.03:1），`SCHEMA.ui.theme` 加 `alias: { ivory: 'pinkwhite' }` 迁移老值；主题 8 → **7** 套。测试 18 组 1024 项 |
 | **1.7.3** | **修小窗圆环底衬**：`.mini-ring` 是 `<button>`，1.7.0 把 `conic-gradient` 换成内联 SVG 后，浏览器的 UA 默认背景（`buttonface` ≈ `#f0f0f0`）一直露在环内 —— 小窗里看到的是「浅灰圆盘 + 深色 1%」，正是用户 1.7.1 时说的「圆环颜色不那么亮」的根源；1.7.3 显式 `background: transparent`，并把双层环的外圈轨道由 `--bg-hi`(#232323，深底上几乎看不见) 换回 `--line`(#292929)。测试 18 组 1018 项 |
 | **1.7.2** | **小窗手感与主题扩充**：圆环改**双层环**（外圈只留更暗的轨道、进度画在内圈 r=12.6）、图标全部改**实心**且颜色只跟主题走（删掉 1.7.1 的深蓝边缘描边）、两格数值与标签**同一行**（窄档回标签下面）、底部两个方形按钮留在右栏并居中、折叠/切主题/横竖排切换加**淡入淡出**（拖动仍零补间）、主题 5 → **8** 套（新增象牙白 / 雾蓝浅两套浅色底 + 黑色适配 AE 原生深色 UI）。测试 18 组 1016 项 |
@@ -891,8 +892,8 @@ node tests/wiring.test.js
 
 | 事项 | 现状 |
 |---|---|
-  | 版本 | 1.7.6（只在 `CSXS/manifest.xml` 的 `ExtensionBundleVersion`；面板界面不显示版本） |
-| 源码 | `<工作区>/AESystemMonitor-1.6.0/`（目录名对应 1.6.0 发布，源码内 manifest 已升到 1.7.6），11 个运行文件 + 19 组测试（`tests/` 共 4301 行） |
+  | 版本 | 1.7.8（只在 `CSXS/manifest.xml` 的 `ExtensionBundleVersion`；面板界面不显示版本） |
+| 源码 | `<工作区>/AESystemMonitor-1.6.0/`（目录名对应 1.6.0 发布，源码内 manifest 已升到 1.7.8），11 个运行文件 + 19 组测试（`tests/` 共 4358 行） |
 | 已部署 | 是。已复制到 `%APPDATA%\Adobe\CEP\extensions\AESystemMonitor`，13 个部署项、逐字节与源码 0 差异 |
 | 测试 | 19 组 1072 项全过；本机与无 AE 环境数字一致（命令见 [7.4](#74-一条命令复跑)） |
 | 面板入口 | `index.html` → `js/main.js` 的 `init()` |
@@ -919,7 +920,7 @@ cd <工作区>/AESystemMonitor
 # 1. 改完先自检语法
 node --check js/main.js
 
-# 2. 跑全量测试，必须 1072/1072
+# 2. 跑全量测试，必须 1089/1089
 for f in tests/*.test.js; do printf '%-28s' "$f"; node "$f" | tail -1; done
 
 # 3. 部署（Windows PowerShell）
@@ -1012,7 +1013,7 @@ Copy-Item index.html -Destination $d -Force
 7) 不要用同步子进程取磁盘/系统信息（1.4.0 刚把 PowerShell 移出热路径）
 8) 新增可调参数一律进 js/settings.js 的 SCHEMA，不要裸存 localStorage
 
-工作流：改代码 → node --check → 跑 tests/ 全部（必须 1072/1072，0 失败）
+工作流：改代码 → node --check → 跑 tests/ 全部（必须 1089/1089，0 失败）
 → 复制到 %APPDATA%\Adobe\CEP\extensions\AESystemMonitor → 关掉面板标签重开。
 
 我要你做的事：<在这里写你的目标>
@@ -1132,6 +1133,7 @@ Copy-Item index.html -Destination $d -Force
 | **小窗几何连续（1.7.1）** | **环 `--mini-ring: 30vh`（44–64px 夹）、间距 `calc(4px + 1.7vh)`、左右 `calc(4px + 4vw)`、内边距 `calc(3px + 2.4vh)` / `calc(3px + 1.1vw)`、图标 `calc(5px + 1.4vh)`（7–9px 夹，1.7.2 抬高下限）；三个离散尺寸断点已删，横排断点保留；瞬时无过渡** | `css/style.css` 的 `.mini` 变量块与文件末尾断点区 |
 | **面板主题（1.7.4）** | **`USR.ui.theme` 七套：mint 薄荷绿 / azure 天青蓝 / lotus 藕紫 / pink 淡粉 / pinkwhite 白粉 / mist 雾蓝浅 / black 黑色（1.7.2 新增后三套，1.7.4 删掉灰色并把象牙白改成白粉 —— 白粉底色 `#fffafc`、文字 `#a83a63`，两套浅色底 + 一套纯黑适配 AE 原生深色 UI）；`body[data-theme]` 换一组 CSS 变量，顶部色点与抽屉一行两处联动；warn/bad 语义不变；颜色只许出现在变量定义里、对比度由 `[8h]` 用 WCAG 公式断言** | `js/settings.js` 的 `THEMES` / `SCHEMA.ui.theme`；`js/main.js` 的 `applyTheme` / `setTheme`；`index.html` 的 `#btnTheme` / `#themeRow` |
 | **小窗两格排版（1.7.4）** | **数值一律在标签下面**：`.mini-stats .ms` 由 1.7.2 的 `flex-direction: row` 改回 `column`，`> * + *` 的间距换成 `margin-top: 1px`；顺带删掉「≤180px 才竖排」那个断点（它带来的宽窄不一致与省略截断就是用户图二看到的问题）；两格仍并排不上下堆叠（96×132 堆叠会高出视口）。**验证**：`check_174_ellipsis.py` 在 12 个尺寸上逐格量 `scrollWidth > clientWidth`（截断）与「数值 y 是否在标签行下方」 | `css/style.css` 的 `.mini-stats .ms`；`check_174_ellipsis.py` |
+| **清理缓存（1.7.8）** | **按钮只请求 AE 清理，不删文件**：`sysmon_purge()` → `findMenuCommandId('Purge>All Memory & Disk Cache')` → `executeCommand(id)`；两次点击确认窗口 `PURGE_ARM_MS = 4000`；清理后 `ST.cache.scanned = 0` + `scanCache(true)` 重扫 | `jsx/host.jsx` 的 `sysmon_purge`；`js/main.js` 的 `requestPurge` / `doPurge`；`index.html` 的 `#btnPurge` / `#miniPurge` |
 | **小窗圆环底衬（1.7.3）** | **`.mini-ring` 显式 `background: transparent`** —— `<button>` 的 UA 默认背景（`buttonface` ≈ `#f0f0f0`）在 1.7.0 换掉 `conic-gradient` 后一直露白，是小窗「太亮」的根源 | `css/style.css` 的 `.mini-ring` |
 | 环形图 | 内联 SVG，`r=15.9155`（周长=100）+ `stroke-dasharray:100` / `dashoffset:100-p`，整体 `rotate(-90deg)`；**1.7.2 起小窗改双层环**：外圈只留轨道（`--bg-hi`；1.7.3 换回 `--line`，深底上看得见）、进度画在内圈 `r=12.6`（周长≈79.17，`setArc` 只在 `.arc-in` 存在时才写），主面板仍是单圈 | `index.html` / `css/style.css` / `js/main.js` 的 `setArc` |
 | 提交内存三档 | 92% / 80% / 70%（权重 45/28/12） | `js/guard.js` 的 `W` 与 `COMMIT_*` |
@@ -1174,7 +1176,7 @@ Copy-Item index.html -Destination $d -Force
 | `js/guard.js` | 421 | 崩溃风险判定（提交内存 + 崩溃史）、六道安全闸 | 是 |
 | `js/trend.js` | 275 | 双字段采样、余量/缓存斜率、归因文案、ETA 格式化 | 是 |
 | `js/backup.js` | 186 | 回退副本命名、按路径哈希分夹、轮转保留份数、挑最新、**落点决策 `pickRoot`** | 是 |
-| `js/main.js` | 3624 | 展示与调度（唯一胶水层，技术债所在）；1.6.0 起 toast 落进面板内、首屏视图可配置；**1.6.2 起副本列表逐份取回、小窗占用行；1.6.4 起回退落点可改、补发刷新链 P0 修复；**1.7.1 起面板主题（`applyTheme`/`setTheme`/`buildThemeOptions`）；1.7.6 起主题不再被归一化冲掉、小窗形态可记忆、7 处手写白名单拆成 `normFromUSR`；1.7.7 起自动保存成功默认静默（失败仍必报）** | 否（依赖 DOM） |
+| `js/main.js` | 3699 | 展示与调度（唯一胶水层，技术债所在）；1.6.0 起 toast 落进面板内、首屏视图可配置；**1.6.2 起副本列表逐份取回、小窗占用行；1.6.4 起回退落点可改、补发刷新链 P0 修复；**1.7.1 起面板主题（`applyTheme`/`setTheme`/`buildThemeOptions`）；1.7.6 起主题不再被归一化冲掉、小窗形态可记忆、7 处手写白名单拆成 `normFromUSR`；1.7.7 起自动保存成功默认静默（失败仍必报）** | 否（依赖 DOM） |
 | `jsx/host.jsx` | 115 | ExtendScript：版本 / 工程状态 / 静默保存 | 是（假 AE 对象） |
 | `CSXS/manifest.xml` | 65 | CEP 注册、Host 区间、CEF 参数 | 接线测试查声明 |
 | `install.bat` / `uninstall.bat` | — | 安装卸载，写 `CSXS.6~12` 的 `PlayerDebugMode` | 否 |
