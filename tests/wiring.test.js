@@ -455,14 +455,14 @@ ok('四个主题函数与两个控件都还在（换主题清单不该顺手改�
 ok('小窗两格的 DOM 结构没变（只改 CSS 方向：图标+标签一行、数值下一行）',
    /class="ms-h"/.test(htmlCode) && /<b id="mv1">/.test(htmlCode) && /<b id="mv2">/.test(htmlCode));
 
-console.log('\n[8k] 请 AE 清理磁盘缓存（1.7.8）');
+console.log('\n[8k] 请 AE 清理磁盘缓存（1.7.8 / 1.7.9 改一次点击）');
 {
   ok('面板里有清理按钮 #btnPurge', html.indexOf('id="btnPurge"') >= 0);
   ok('极简小窗里有清理按钮 #miniPurge', html.indexOf('id="miniPurge"') >= 0);
   ok('极简的清理按钮在按钮行里（和 ↗ ≡ 同一行）',
     /<div class="mini-row">[\s\S]{0,400}?id="miniPurge"/.test(html));
-  ok('面板的清理按钮在缓存路径那一行（紧跟 ↗ 打开目录）',
-    /id="btnOpen"[\s\S]{0,320}?id="btnPurge"/.test(html));
+  ok('面板的清理按钮在缓存卡头部（不用展开就看得见）',
+    /id="cacheVerdict"[\s\S]{0,420}?id="btnPurge"[\s\S]{0,420}?id="tgCache"/.test(html));
   ok('有 requestPurge / doPurge / purgeBlocked 三个函数',
     /function requestPurge\(/.test(mainJs) && /function doPurge\(/.test(mainJs) &&
     /function purgeBlocked\(/.test(mainJs));
@@ -475,16 +475,17 @@ console.log('\n[8k] 请 AE 清理磁盘缓存（1.7.8）');
     purgeBlock.length > 200 && !/rmSync|unlinkSync|unlink\(|copyFile/.test(purgeBlock));
   ok('渲染中拒绝清理（不打扰宿主）', /渲染中不清理/.test(mainJs));
   ok('没有 AE 时也拒绝并说明', /没有 AE，清理缓存不可用/.test(mainJs));
-  ok('两次点击确认（4 秒窗口）',
-    /PURGE_ARM_MS = 4000/.test(mainJs) && /if \(purgeArmed\(\)\)/.test(mainJs));
+  ok('一次点击就执行（不再有二次确认残留）',
+    !/PURGE_ARM_MS/.test(mainJs) && !/purgeArmed\(/.test(mainJs) &&
+    !/markPurge\(/.test(mainJs) && css.indexOf('.ibtn.armed') < 0);
   ok('清完要作废旧读数并重扫（AE 清理是异步的）',
     /ST\.cache\.scanned = 0/.test(mainJs) && /scanCache\(true\)/.test(mainJs));
   var hostSrc = read('jsx/host.jsx');
   ok('host.jsx 用 AE 自己的菜单命令清缓存',
     /function sysmon_purge\(/.test(hostSrc) &&
     /findMenuCommandId/.test(hostSrc) && /executeCommand/.test(hostSrc));
-  ok('CSS 里有图标与待确认态样式',
-    /\.ibtn \.g \{/.test(css) && /\.ibtn\.armed \{/.test(css));
+  ok('CSS 里有图标样式（带确认态的 armed 已删）',
+    /\.ibtn \.g \{/.test(css) && css.indexOf('.ibtn.armed') < 0);
 }
 
 ok('MinSize 宽度 <= 120', /<Width>(\d+)<\/Width>/.test(manifest) &&
@@ -829,10 +830,11 @@ console.log('\n[18] 文档测试计数与实测一致');
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
   ok('CHANGELOG 的 1.7.1 条目写 1003 项',
      /## 1\.7\.1[\s\S]*?1003 项/.test(changelog));
-  ok('CHANGELOG 的 1.7.2 / 1.7.3 / 1.7.4 / 1.7.8 条目写对了计数',
+  ok('CHANGELOG 的 1.7.2 / 1.7.3 / 1.7.4 / 1.7.8 / 1.7.9 条目写对了计数',
      /## 1\.7\.2[\s\S]*?1016 项/.test(changelog) && /## 1\.7\.3[\s\S]*?1018 项/.test(changelog) &&
      /## 1\.7\.4[\s\S]*?1024 项/.test(changelog) &&
-     /## 1\.7\.8[\s\S]*?1089 项/.test(changelog));
+     /## 1\.7\.8[\s\S]*?1089 项/.test(changelog) &&
+     /## 1\.7\.9[\s\S]*?1089 项/.test(changelog));
   ok('README 写 1089 项', /1089 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石

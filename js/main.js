@@ -573,50 +573,22 @@
   /* ---------------- 请 AE 清理磁盘缓存（1.7.8） ---------------- */
   // 面板一个文件都不删：AE 的缓存目录里有它自己的账本，外部删文件会让账本对不上。
   // 这里只调 AE 的菜单命令（jsx/host.jsx 的 sysmon_purge），让 AE 自己清自己的。
-  // 两次点击确认：清缓存不可撤销，误触要让 AE 重算一遍。
-  var PURGE_ARM_MS = 4000;
-
+  // 一次点击直接执行（不再二次确认）。渲染中与无宿主仍然拒绝 ——
+  // 这两条是安全边界（清到一半会打断渲染），不是确认步骤。
   function purgeBlocked() {
     if (!hasCEP) return 'nohost';
     if (ST.proj && ST.proj.rq === 1) return 'render';
     return '';
   }
 
-  function purgeArmed() {
-    return !!(ST.purgeArm && (Date.now() - ST.purgeArm) < PURGE_ARM_MS);
-  }
-
-  function markPurge(on) {
-    var ids = ['btnPurge', 'miniPurge'];
-    for (var i = 0; i < ids.length; i++) {
-      var el = $(ids[i]);
-      if (!el) continue;
-      el.className = el.className.replace(/\s*armed/g, '') + (on ? ' armed' : '');
-      el.title = on
-        ? '再点一次：请 AE 清理磁盘缓存'
-        : '请 AE 清理磁盘缓存（走 AE 自己的清理命令，不删文件）';
-    }
-  }
-
   function requestPurge() {
     var why = purgeBlocked();
     if (why === 'nohost') { toast('这套环境里没有 AE，清理缓存不可用'); return; }
     if (why === 'render') { toast('渲染中不清理：AE 主线程被占死，清到一半会打断渲染'); return; }
-
-    if (purgeArmed()) { ST.purgeArm = 0; doPurge(); return; }
-
-    ST.purgeArm = Date.now();
-    markPurge(true);
-    toast('再点一次「清理」，让 AE 自己清磁盘缓存（面板不删文件）');
-    setTimeout(function () {
-      if (purgeArmed()) return;
-      ST.purgeArm = 0;
-      markPurge(false);
-    }, PURGE_ARM_MS + 60);
+    doPurge();
   }
 
   function doPurge() {
-    markPurge(false);
     var before = (ST.cache && ST.cache.used) || 0;
     var done = false;
 

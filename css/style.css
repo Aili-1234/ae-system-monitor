@@ -1381,7 +1381,6 @@ body:not(.compact) .app { animation: vFade .18s ease; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.ibtn.armed {
   color: var(--warn);
   border-color: var(--warn);
 }
