@@ -1,5 +1,30 @@
 # 变更记录
 
+## 1.7.11 —— 修好「清理缓存」真正失败的原因：`app.purge` 需要参数
+
+**现象**（用户真机截图）：「清理没生效：After Effects 错误: 由于调用需要 1 个参数，无法调用 "purge"。」
+
+**根因**：AE 24 里 `app.purge` **是存在的**，但签名是 `app.purge(target)`，`target` 是 `PurgeTarget` 枚举
+（`ALL_CACHES` / `UNDO_CACHES` / `IMAGE_CACHES` / …）。1.7.8 起的实现是「探到 `app.purge` 就当能无参调用」，
+于是必然抛错；而菜单兜底只试了 `Purge>All Memory & Disk Cache` 与一种中文写法，
+中文界面下 `findMenuCommandId` 也没命中 —— 两条路一起失败，面板就把 purge 的报错原样显示出来。
+
+**改法**（`jsx/host.jsx` 的 `sysmon_purge()`）
+
+| 顺序 | 做法 | 理由 |
+|---|---|---|
+| 1 | `app.purge(PurgeTarget.ALL_CACHES)` | 这是 AE 自己的清理 API，一次清内存 + 磁盘缓存 |
+| 2 | 枚举缺失 → **跳过** API 路，不猜数字 | 给错 target 会清错东西（比如只清 undo），宁可走菜单 |
+| 3 | `findMenuCommandId` 试 5 种写法（含「编辑>清理>全部内存和磁盘缓存」）→ `executeCommand` | 中文/英文界面的菜单名不同 |
+| 4 | 都失败 → 回报「purge 接口原因 + 菜单原因」 | 下次报错不用猜是哪条断的 |
+
+返回值多带 `how=api|menu`，一眼看出走的哪条路。
+
+**验证**：`tests/hostjsx.test.js` 43 → 46 条 —— ①有 `PurgeTarget` 时确实调 `app.purge(ALL_CACHES)`
+（并把参数记下来断言等于枚举值）；②`purge` 抛错时回落到中文菜单名；③两条路都失败时错误串里两边原因都在。
+
+测试：19 组 **1102 项**（hostjsx 46）。
+
 ## 1.7.10 —— 清理缓存「点一次 / 安全模式点两次」自己设
 
 **为什么要这一版**：1.7.9 按用户要求把两次点击改成一次，但「一次点掉全部缓存」对多工程/渲染中途的人偏激进。

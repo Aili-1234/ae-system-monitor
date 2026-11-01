@@ -831,10 +831,10 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「19 组、1099 项断言」',
-     /19 组、\*\*1099 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1099/1099（不是旧数）',
-     /必须 1099\/1099/.test(report));
+  ok('PLUGIN-REPORT 声明「19 组、1102 项断言」',
+     /19 组、\*\*1102 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1102/1102（不是旧数）',
+     /必须 1102\/1102/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
@@ -845,8 +845,9 @@ console.log('\n[18] 文档测试计数与实测一致');
      /## 1\.7\.4[\s\S]*?1024 项/.test(changelog) &&
      /## 1\.7\.8[\s\S]*?1089 项/.test(changelog) &&
      /## 1\.7\.9[\s\S]*?1089 项/.test(changelog) &&
-     /## 1\.7\.10[\s\S]*?1099 项/.test(changelog));
-  ok('README 写 1099 项', /1099 项/.test(readme));
+     /## 1\.7\.10[\s\S]*?1099 项/.test(changelog) &&
+     /## 1\.7\.11[\s\S]*?1102 项/.test(changelog));
+  ok('README 写 1102 项', /1102 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

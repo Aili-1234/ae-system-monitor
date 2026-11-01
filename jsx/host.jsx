@@ -118,18 +118,38 @@ function sysmon_save() {
    返回 ok=1 表示命令发出去了（AE 的清理本身是异步的，成效要过一会儿再看）。 */
 function sysmon_purge() {
     var t0 = new Date().getTime();
-    var ok = 0, id = 0, err = '';
+    var ok = 0, id = 0, how = '', err = '', e1 = '', e2 = '';
 
-    // AE 多数版本没有 app.purge，只有菜单命令；先探一下，探不到就只走菜单。
-    try { if (app.purge) { app.purge(); ok = 1; id = -1; } } catch (e0) {
-        err = String(e0 && e0.message ? e0.message : e0);
+    // 路径一：AE 脚本 API。注意签名是 purge(target)，
+    // target 是 PurgeTarget 枚举——无参调用会抛
+    // "由于调用需要 1 个参数，无法调用 purge"（1.7.10 及以前就是这么错的，用户截图里那条报错）。
+    // 枚举拿不到就不猜数字：给错 target 会清错东西，宁可走菜单。
+    var tgt = null;
+    try {
+        if (typeof PurgeTarget !== 'undefined' && PurgeTarget && PurgeTarget.ALL_CACHES !== undefined) {
+            tgt = PurgeTarget.ALL_CACHES;
+        }
+    } catch (e0) { tgt = null; }
+
+    if (tgt !== null) {
+        try {
+            app.purge(tgt);
+            ok = 1; how = 'api'; id = -1;
+        } catch (eA) {
+            e1 = String(eA && eA.message ? eA.message : eA);
+        }
+    } else {
+        e1 = '这个版本没有 PurgeTarget 枚举';
     }
 
+    // 路径二：菜单命令。中文界面的菜单名不只一种写法，多试几个。
     if (!ok) {
-        // 英文/中文两种界面都试一遍：findMenuCommandId 在中文界面下可能只认本地化名字
         var names = [
             'Purge>All Memory & Disk Cache',
-            '\u6e05\u7406>\u5168\u90e8\u5185\u5b58\u548c\u78c1\u76d8\u7f13\u5b58'
+            'Purge > All Memory & Disk Cache',
+            'Edit>Purge>All Memory & Disk Cache',
+            '编辑>清理>全部内存和磁盘缓存',
+            '清理>全部内存和磁盘缓存'
         ];
         var i, mid;
         for (i = 0; i < names.length && !ok; i++) {
@@ -137,17 +157,19 @@ function sysmon_purge() {
                 mid = app.findMenuCommandId(names[i]);
                 if (mid && mid > 0) {
                     app.executeCommand(mid);
-                    ok = 1;
-                    id = mid;
+                    ok = 1; how = 'menu'; id = mid;
                 }
-            } catch (e1) {
-                if (!err) err = String(e1 && e1.message ? e1.message : e1);
+            } catch (eB) {
+                if (!e2) e2 = String(eB && eB.message ? eB.message : eB);
             }
         }
-        if (!ok && !err) err = 'AE 没有"清理 > 全部内存和磁盘缓存"这条命令';
+        if (!ok && !e2) e2 = '菜单里没找到清理命令（试了 5 种写法）';
     }
 
-    return 'ok=' + ok + '&id=' + id +
+    // 两条路都没成功时把两边的原因都带回去，下次报错不用猜
+    if (!ok) err = 'purge 接口：' + e1 + '；菜单：' + e2;
+
+    return 'ok=' + ok + '&id=' + id + '&how=' + how +
            '&err=' + encodeURIComponent(err) +
            '&ms=' + (new Date().getTime() - t0);
 }

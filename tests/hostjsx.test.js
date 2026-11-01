@@ -178,7 +178,7 @@ ok('内联 JSX 不使用 let/const', !/\b(let|const)\s/.test(inlineJsx));
 
 /* ---------- 5. sysmon_purge：用假 app 真跑一遍（属性名打错会在这里露馅） ---------- */
 {
-  const box = new Function('app', 'encodeURIComponent',
+  const box = new Function('app', 'encodeURIComponent', 'PurgeTarget',
     hostJsx + '\nreturn { purge: sysmon_purge };');
   const calls = [];
   const fakeApp = {
@@ -188,17 +188,49 @@ ok('内联 JSX 不使用 let/const', !/\b(let|const)\s/.test(inlineJsx));
     },
     executeCommand: function (id) { calls.push(id); return true; }
   };
-  const api = box(fakeApp, encodeURIComponent);
+  const api = box(fakeApp, encodeURIComponent, undefined);
   const r1 = parseKV(api.purge());
   ok('找到清理菜单并执行', r1 && r1.ok === 1 && calls[0] === 4242, JSON.stringify(r1));
   ok('回报菜单 id（不用猜哪个名字命中了）', r1 && r1.id === 4242, r1 && r1.id);
   ok('耗时是数字毫秒', r1 && typeof r1.ms === 'number' && r1.ms >= 0, r1 && r1.ms);
 
+  // 1.7.11：app.purge 必须带 PurgeTarget 参数（无参调用在 AE 24 上直接抛错，
+  // 这正是用户截图里「由于调用需要 1 个参数，无法调用 purge」的来源）
+  const purgeArgs = [];
+  const apiApp = {
+    version: '24.2.1',
+    purge: function (t) { purgeArgs.push(t); },
+    findMenuCommandId: function () { return 0; },
+    executeCommand: function () { return true; }
+  };
+  const rawApi = box(apiApp, encodeURIComponent, { ALL_CACHES: 7 }).purge();
+  const rApi = parseKV(rawApi);
+  ok('有 PurgeTarget 时走 app.purge(ALL_CACHES)',
+    rApi && rApi.ok === 1 && /&how=api(&|$)/.test(rawApi) && purgeArgs[0] === 7, rawApi);
+
+  const throwApp = {
+    version: '24.2.1',
+    purge: function () { throw new Error('需要参数'); },
+    findMenuCommandId: function (name) {
+      return name === '\u7f16\u8f91>\u6e05\u7406>\u5168\u90e8\u5185\u5b58\u548c\u78c1\u76d8\u7f13\u5b58' ? 9090 : 0;
+    },
+    executeCommand: function (id) { return true; }
+  };
+  const rawMenu = box(throwApp, encodeURIComponent, { ALL_CACHES: 7 }).purge();
+  const rMenu = parseKV(rawMenu);
+  ok('purge 抛错时回落到菜单命令（中文界面写法）',
+    rMenu && rMenu.ok === 1 && /&how=menu(&|$)/.test(rawMenu) && String(rMenu.id) === '9090',
+    rawMenu);
+
   const bare = { version: '24.2.1' };
-  const api2 = box(bare, encodeURIComponent);
+  const api2 = box(bare, encodeURIComponent, undefined);
   const r2 = parseKV(api2.purge());
   ok('没有清理入口时 ok=0 且带原因', r2 && r2.ok === 0 && String(r2.err).length > 0,
     r2 && r2.err);
+  ok('两条路都失败时把两边原因都带回来（下次不用猜）',
+    r2 && /purge \u63a5\u53e3/.test(decodeURIComponent(String(r2.err))) &&
+    /\u83dc\u5355/.test(decodeURIComponent(String(r2.err))),
+    decodeURIComponent(String(r2 && r2.err)));
 }
 
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
