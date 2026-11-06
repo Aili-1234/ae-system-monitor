@@ -467,7 +467,7 @@ console.log('\n[8k] 请 AE 清理磁盘缓存（1.7.8 · 1.7.9 一次点击 · 1
     /function requestPurge\(/.test(mainJs) && /function doPurge\(/.test(mainJs) &&
     /function purgeBlocked\(/.test(mainJs));
   ok('真清动作是调 JSX 的 sysmon_purge，不是删文件',
-    /evalScript\('sysmon_purge\(\)'/.test(mainJs));
+    /aeEval\('sysmon_purge\(\)'/.test(mainJs));
   var pp0 = mainJs.indexOf('function doPurge() {');
   var pp1 = mainJs.indexOf('渲染中静音', pp0);
   var purgeBlock = (pp0 >= 0 && pp1 > pp0) ? mainJs.slice(pp0, pp1) : '';
@@ -506,6 +506,38 @@ ok('Host 下界回到 AE 2018 (15.0)：1.7.0 已把 flex gap / clamp / inset 全
 ok('Host 上限为 99.9（覆盖未来版本）', /Version="\[15\.0,99\.9\]"/.test(manifest));
 ok('RequiredRuntime 回到 CEP 8（与 Host 下界一致）',
    /<RequiredRuntime Name="CSXS" Version="8\.0"/.test(manifest));
+
+console.log('\n[8l] 1.7.12：AE 脚本调用统一走总线 + 清理点下去有回音');
+{
+  ok('有 AE 脚本总线 AE_TX，且 aeEval 带超时放手',
+    /var AE_TX = \{ busy: false, until: 0 \};/.test(mainJs) &&
+    /function aeEval\(jsx, cb, quietMs, timeoutMs\)/.test(mainJs) &&
+    /var AE_TX_TIMEOUT = 4000;/.test(mainJs));
+  ok('宿主不回话时到点释放 busy（否则总线会被永久占死、清理永远点不动）',
+    /setTimeout\(function \(\) \{ fin\(null\); \}, timeoutMs > 0 \? timeoutMs : AE_TX_TIMEOUT\);/.test(mainJs));
+  ok('静默窗：保存 1.2 秒、清理 1.5 秒',
+    /var AE_QUIET_SAVE = 1200;/.test(mainJs) && /var AE_QUIET_PURGE = 1500;/.test(mainJs));
+  ok('main.js 里只有总线内部一处 evalScript（没有绕过总线的调用）',
+    (mainJs.match(/window\.__adobe_cep__\.evalScript\(/g) || []).length === 1);
+  ok('心跳 readAE 走总线并自带 2.5 秒放手',
+    /aeEval\(jsx, function \(res\) \{ finish\(parseAE\(res\)\); \}, 0, 2500\)/.test(mainJs));
+  ok('保存走总线、静默 1.2 秒、20 秒放手',
+    /aeEval\('sysmon_save\(\)', function \(raw\) \{ finish\(parseKV\(raw\)\); \}, AE_QUIET_SAVE, 20000\)/.test(mainJs));
+  ok('清理走总线、30 秒放手（清大缓存本来就久，4 秒会误报失败）',
+    /aeEval\('sysmon_purge\(\)', finish, AE_QUIET_PURGE, 30000\)/.test(mainJs));
+  ok('点下去立刻有回音（不再「点了没反应」）',
+    /toast\('正在请 AE 清理缓存…（大缓存可能要十几秒）'\)/.test(mainJs));
+  ok('正在清理时连点只提示、不重发',
+    /var purgeBusy = false;/.test(mainJs) &&
+    /if \(purgeBusy\) \{ toast\('正在清理，等 AE 把这一轮清完'\); return; \}/.test(mainJs) &&
+    /markPurgeBusy\(true\);/.test(mainJs) && /markPurgeBusy\(false\);/.test(mainJs));
+  ok('忙碌态按钮变淡且不可点（CSS）',
+    /\.ibtn\.busy \{[\s\S]{0,160}?pointer-events: none;/.test(cssCode));
+  ok('模态错误翻成人话（保存失败与清理失败两条路都用）',
+    /function aeErrText\(s\)/.test(mainJs) &&
+    /AE 正在弹窗（进度框或对话框），关掉它再试/.test(mainJs) &&
+    /aeErrText\(ST\.guard\.lastErr\)/.test(mainJs) && /aeErrText\(why\)/.test(mainJs));
+}
 
 console.log('\n[9b] 安装脚本覆盖旧版 CEP 的调试开关');
 const installBat = read('install.bat');
@@ -785,7 +817,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 320;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 331;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -831,10 +863,10 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「19 组、1102 项断言」',
-     /19 组、\*\*1102 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1102/1102（不是旧数）',
-     /必须 1102\/1102/.test(report));
+  ok('PLUGIN-REPORT 声明「19 组、1118 项断言」',
+     /19 组、\*\*1118 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1118/1118（不是旧数）',
+     /必须 1118\/1118/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
@@ -846,8 +878,9 @@ console.log('\n[18] 文档测试计数与实测一致');
      /## 1\.7\.8[\s\S]*?1089 项/.test(changelog) &&
      /## 1\.7\.9[\s\S]*?1089 项/.test(changelog) &&
      /## 1\.7\.10[\s\S]*?1099 项/.test(changelog) &&
-     /## 1\.7\.11[\s\S]*?1102 项/.test(changelog));
-  ok('README 写 1102 项', /1102 项/.test(readme));
+     /## 1\.7\.11[\s\S]*?1102 项/.test(changelog) &&
+     /## 1\.7\.12[\s\S]*?1118 项/.test(changelog));
+  ok('README 写 1118 项', /1118 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

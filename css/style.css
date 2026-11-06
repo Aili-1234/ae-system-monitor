@@ -1389,3 +1389,10 @@ body:not(.compact) .app { animation: vFade .18s ease; }
   color: var(--warn);
   border-color: var(--warn);
 }
+
+/* 清理进行中：按钮变淡、不可点（1.7.12）。
+   逻辑上由 purgeBusy 挡连点，这里只是让人一眼看出「它在办事」。 */
+.ibtn.busy {
+  opacity: .45;
+  pointer-events: none;
+}

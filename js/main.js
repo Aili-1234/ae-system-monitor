@@ -540,6 +540,58 @@
     };
   }
 
+  /* ---------------- AE 脚本总线（1.7.12） ----------------
+     AE 同一时刻只认一个脚本：心跳（每 3 秒）与保存 / 清理这类动作同时派进去，
+     AE 就会弹「在行 0 无法执行脚本。当模式对话框正在等待回应时，无法运行脚本。」
+     —— 用户看到的是一个莫名其妙的模态框，而且往往正好出现在保存时。
+
+     现在所有 evalScript 统一走 aeEval：一次只发一个；忙或处在静默窗时**跳过**
+     （心跳跳过没有损失，排队反而会积压出一串迟到脚本）。
+     动作类调用后压一段静默窗：保存的进度框、清理的删除过程期间不再插话。 */
+  var AE_TX = { busy: false, until: 0 };
+  var AE_QUIET_SAVE = 1200;    // 保存后静默：app.project.save() 会弹进度框
+  var AE_QUIET_PURGE = 1500;   // 清理后静默（清理期间另由 purgeBusy 挡连点）
+  var AE_TX_TIMEOUT = 4000;    // 总线兜底：宿主不回话也必须放手
+
+  function aeQuiet(ms) {
+    if (!(ms > 0)) return;
+    var t = Date.now() + ms;
+    if (t > AE_TX.until) AE_TX.until = t;
+  }
+
+  function aeFree() { return !!hasCEP && !AE_TX.busy && Date.now() >= AE_TX.until; }
+
+  // 发一个脚本；发不出去（无宿主 / 忙 / 静默窗）返回 false 并立刻回调 null
+  // timeoutMs：宿主一直不回话时的兜底 —— 到点必须释放 busy，否则总线会被永久占死，
+  //            之后所有脚本（含清理）都会被跳过，用户看到的就是「点了没反应」。
+  function aeEval(jsx, cb, quietMs, timeoutMs) {
+    if (!hasCEP) { if (cb) cb(null); return false; }
+    if (!aeFree()) { if (cb) cb(null); return false; }
+
+    AE_TX.busy = true;
+    var done = false;
+    function fin(v) {
+      if (done) return;
+      done = true;
+      AE_TX.busy = false;
+      aeQuiet(quietMs);
+      if (cb) cb(v);
+    }
+    try { window.__adobe_cep__.evalScript(jsx, fin); }
+    catch (e) { fin(null); }
+    setTimeout(function () { fin(null); }, timeoutMs > 0 ? timeoutMs : AE_TX_TIMEOUT);
+    return true;
+  }
+
+  // AE 的模态错误翻成人话：这类错误不是「清理失败」，而是「它自己在弹窗」
+  function aeErrText(s) {
+    s = String(s == null ? '' : s);
+    if (/模式对话框|modal dialog|无法运行脚本|while a modal/i.test(s)) {
+      return 'AE 正在弹窗（进度框或对话框），关掉它再试';
+    }
+    return s;
+  }
+
   function readAE(cb) {
     if (!hasCEP) { cb(null); return; }
 
@@ -560,11 +612,8 @@
     var done = false;
     function finish(v) { if (!done) { done = true; cb(v); } }
 
-    try {
-      window.__adobe_cep__.evalScript(jsx, function (res) {
-        finish(parseAE(res));
-      });
-    } catch (e) { finish(null); }
+    // 走总线：同一时刻只派一个脚本（见上面的 AE 脚本总线）
+    if (!aeEval(jsx, function (res) { finish(parseAE(res)); }, 0, 2500)) finish(null);
     // 渲染中主线程被占死，等 3 秒只是白等：超时改成 1.5 秒，让面板早点收手
     var wait = (ST.proj.rq === 1) ? CFG.aeTimeoutRender : CFG.aeTimeout;
     setTimeout(function () { finish(null); }, wait);
@@ -628,17 +677,34 @@
     toast('再点一次就清理缓存（4 秒内）');
   }
 
+  // 正在清理：连点只提示不重发（1.7.12）。这一个标记同时让两颗按钮显示忙碌态。
+  var purgeBusy = false;
+
+  function markPurgeBusy(on) {
+    purgeBusy = !!on;
+    var ids = ['btnPurge', 'miniPurge'];
+    for (var i = 0; i < ids.length; i++) {
+      var b = $(ids[i]);
+      if (!b) continue;
+      if (on) { b.classList.add('busy'); b.title = '正在清理…（AE 清大缓存可能要十几秒）'; }
+      else { b.classList.remove('busy'); b.title = '请 AE 清理磁盘缓存（走 AE 自己的清理命令，不删文件）'; }
+    }
+  }
+
   function doPurge() {
+    if (purgeBusy) { toast('正在清理，等 AE 把这一轮清完'); return; }
+
     var before = (ST.cache && ST.cache.used) || 0;
     var done = false;
 
     function finish(raw) {
       if (done) return;
       done = true;
+      markPurgeBusy(false);
       var r = parseKV(raw);
       if (!r || Number(r.ok) !== 1) {
-        var why = (r && r.err) ? String(r.err) : 'AE 没有响应';
-        toast('清理没生效：' + why + '；可以到 AE 菜单「编辑 > 清理」手动清');
+        var why = (r && r.err) ? String(r.err) : 'AE 没回应（可能正忙）';
+        toast('清理没生效：' + aeErrText(why) + '；可以到 AE 菜单「编辑 > 清理」手动清');
         return;
       }
       toast('已请 AE 清理磁盘缓存（清理前 ' + fmtBytes(before) + '），正在重新统计…');
@@ -650,9 +716,13 @@
       }, 1500);
     }
 
-    try { window.__adobe_cep__.evalScript('sysmon_purge()', finish); }
-    catch (e) { finish(''); }
-    setTimeout(function () { finish(''); }, 4000);
+    // 点下去先给回音：AE 真在删缓存时面板不出声，看起来就是「点了没反应」
+    markPurgeBusy(true);
+    toast('正在请 AE 清理缓存…（大缓存可能要十几秒）');
+
+    // 清理是动作类调用：清完 30 秒内没回话按下失败处理（清大缓存本来就久）
+    if (!aeEval('sysmon_purge()', finish, AE_QUIET_PURGE, 30000)) { finish(''); }
+    setTimeout(function () { finish(''); }, 30000);
   }
 
   /* ---------------- 渲染中静音 ---------------- */
@@ -1673,7 +1743,7 @@
         grd.markFailed(now);                        // 记时间，避免每轮重试卡界面
         ST.guard.lastErr = (o && o.err) || '未收到 AE 响应';
         ST.guard.saveMs = now - started;
-        toast('自动保存失败：' + ST.guard.lastErr + ' · 请尝试手动 Ctrl/Cmd+S 保存');
+        toast('自动保存失败：' + aeErrText(ST.guard.lastErr) + ' · 请尝试手动 Ctrl/Cmd+S 保存');
         logSave(false, why, ST.guard.saveMs, ST.guard.lastErr, ST.projectPath);
       }
       renderGuard();
@@ -1685,11 +1755,11 @@
     ST.guard.lastBackup = (bk && bk.ok) ? bk.path : '';
     ST.guard.backupErr = (bk && !bk.ok && !bk.skipped) ? (bk.err || '备份失败') : '';
 
-    try {
-      window.__adobe_cep__.evalScript('sysmon_save()', function (raw) {
-        finish(parseKV(raw));
-      });
-    } catch (e) { finish(null); }
+    // 保存是动作类调用：之后 1.5 秒内不再派脚本，
+    // 否则心跳会撞进 AE 的保存进度框，弹出「模式对话框」模态警告（1.7.12）
+    if (!aeEval('sysmon_save()', function (raw) { finish(parseKV(raw)); }, AE_QUIET_SAVE, 20000)) {
+      finish(null);
+    }
 
     // 大工程写入可达十几秒，超时按失败处理
     setTimeout(function () { finish(null); }, 20000);

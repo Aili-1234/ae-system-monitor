@@ -519,5 +519,51 @@ console.log('\n[新 14] 面板主题：把 main.js 里那段主题代码抠出�
   ok('[新 15] 渲染中仍然拒绝（安全边界不因模式改变）', blocked);
 }
 
+console.log('\n[新 16] AE 脚本总线：忙与静默窗内必须跳过（不排队）');
+{
+  // 把总线那段从 main.js 抠出来真跑（与 [12] / [新 14] 同一手法）
+  function busSrc() {
+    const a = mainJs.indexOf('var AE_TX = { busy: false, until: 0 };');
+    const b = mainJs.indexOf('// AE 的模态错误翻成人话', a);
+    return (a >= 0 && b > a) ? mainJs.slice(a, b) : '';
+  }
+  function makeBus(hasCEP) {
+    const sent = [];
+    const win = { __adobe_cep__: { evalScript(jsx, cb) { sent.push(jsx); win._cb = cb; } }, _cb: null };
+    const f = new Function('hasCEP', 'window', 'Date', busSrc() +
+      '; return { aeEval: aeEval, aeFree: aeFree, AE_TX: AE_TX };');
+    return { api: f(hasCEP, win, Date), sent, win };
+  }
+
+  const A = makeBus(true);
+  const rare = [];
+  const a1 = A.api.aeEval('first()', function (v) { rare.push(['first', v]); }, 0);
+  const a2 = A.api.aeEval('second()', function (v) { rare.push(['second', v]); }, 0);
+  ok('忙的时候第二个脚本直接跳过（不排队、回调收到 null）',
+    a1 === true && a2 === false && A.sent.length === 1 && rare.length === 1 && rare[0][1] === null);
+
+  A.win._cb('done-1');
+  ok('宿主回了之后总线让出（一次只跑一个，结束才放行）',
+    A.api.AE_TX.busy === false && rare.length === 2 && rare[1][1] === 'done-1');
+
+  const B = makeBus(true);
+  B.api.aeEval('save()', function () {}, 1000);
+  B.win._cb('ok=1');
+  ok('动作类调用后进入静默窗（这期间心跳会被跳过）',
+    B.api.aeFree() === false && B.api.aeEval('beat()', function () {}, 0) === false);
+
+  const C = makeBus(true);
+  let hits = 0;
+  C.api.aeEval('x()', function () { hits++; }, 0);
+  C.win._cb('one');
+  C.win._cb('two');
+  ok('宿主回调两次也只算一次（幂等）', hits === 1);
+
+  const D = makeBus(false);
+  let got = 'unset';
+  const r = D.api.aeEval('x()', function (v) { got = v; }, 0);
+  ok('没有 CEP 时直接返回 false 且回调 null', r === false && got === null);
+}
+
 console.log(`\n===== ${pass} 通过, ${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);
