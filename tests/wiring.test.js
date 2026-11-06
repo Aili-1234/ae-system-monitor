@@ -510,7 +510,7 @@ ok('RequiredRuntime 回到 CEP 8（与 Host 下界一致）',
 console.log('\n[8l] 1.7.12：AE 脚本调用统一走总线 + 清理点下去有回音');
 {
   ok('有 AE 脚本总线 AE_TX，且 aeEval 带超时放手',
-    /var AE_TX = \{ busy: false, until: 0 \};/.test(mainJs) &&
+    /var AE_TX = \{ busy: false, until: 0, modalHits: 0, paused: false \};/.test(mainJs) &&
     /function aeEval\(jsx, cb, quietMs, timeoutMs\)/.test(mainJs) &&
     /var AE_TX_TIMEOUT = 4000;/.test(mainJs));
   ok('宿主不回话时到点释放 busy（否则总线会被永久占死、清理永远点不动）',
@@ -520,7 +520,8 @@ console.log('\n[8l] 1.7.12：AE 脚本调用统一走总线 + 清理点下去有
   ok('main.js 里只有总线内部一处 evalScript（没有绕过总线的调用）',
     (mainJs.match(/window\.__adobe_cep__\.evalScript\(/g) || []).length === 1);
   ok('心跳 readAE 走总线并自带 2.5 秒放手',
-    /aeEval\(jsx, function \(res\) \{ finish\(parseAE\(res\)\); \}, 0, 2500\)/.test(mainJs));
+    /aeEval\(jsx, function \(raw\) \{[\s\S]{0,400}?if \(!row && aeIsModal\(raw\)\)/.test(mainJs) &&
+    /\}, 0, 2500\)/.test(mainJs));
   ok('保存走总线、静默 1.2 秒、20 秒放手',
     /aeEval\('sysmon_save\(\)', function \(raw\) \{ finish\(parseKV\(raw\)\); \}, AE_QUIET_SAVE, 20000\)/.test(mainJs));
   ok('清理走总线、30 秒放手（清大缓存本来就久，4 秒会误报失败）',
@@ -537,6 +538,41 @@ console.log('\n[8l] 1.7.12：AE 脚本调用统一走总线 + 清理点下去有
     /function aeErrText\(s\)/.test(mainJs) &&
     /AE 正在弹窗（进度框或对话框），关掉它再试/.test(mainJs) &&
     /aeErrText\(ST\.guard\.lastErr\)/.test(mainJs) && /aeErrText\(why\)/.test(mainJs));
+}
+
+console.log('\n[8m] 1.7.13：点渲染时不再被「模式对话框」弹框轰炸');
+{
+  ok('插件版本号在面板底部可见（不用再猜装的是哪一版）',
+    /var PLUGIN_VER = '1\.7\.13';/.test(mainJs) && /'v' \+ PLUGIN_VER/.test(mainJs));
+
+  ok('撞上模态先退避 30 秒（AE_MODAL_BASE = 30000）',
+    /var AE_MODAL_BASE = 30000;/.test(mainJs));
+
+  ok('退避按 30/60/120 倍增，不会无限拉长',
+    /AE_MODAL_BASE \* Math\.pow\(2, AE_TX\.modalHits - 1\)/.test(mainJs));
+
+  ok('连撞 3 次直接整体暂停（长时间渲染不再每 3 秒弹一次）',
+    /AE_TX\.modalHits >= 3/.test(mainJs) && /AE_TX\.paused = true;/.test(mainJs));
+
+  ok('暂停/退避期间心跳根本不发（不发就不会弹）',
+    /if \(AE_TX\.paused\) return false;/.test(mainJs));
+
+  ok('能认出模态类错误（中英文都覆盖）',
+    /function aeIsModal/.test(mainJs) &&
+    /模式对话框\|modal dialog\|无法运行脚本\|while a modal/.test(mainJs));
+
+  ok('心跳回包先判模态再落数据（模态那一拍直接丢）',
+    /if \(!row && aeIsModal\(raw\)\) \{ aeModalBackoff\(\); return finish\(null\); \}/.test(mainJs));
+
+  ok('底部一行点一下就恢复监视',
+    /\$\('footRight'\)\.addEventListener\('click', function \(\) \{ if \(AE_TX\.paused\) aeResume\(\); \}\);/.test(mainJs));
+
+  ok('JSX 保存期间压掉 AE 自己的对话框（begin/end 成对）',
+    /app\.beginSuppressDialogs\(0\)/.test(read('jsx/host.jsx')) &&
+    /app\.endSuppressDialogs\(false\)/.test(read('jsx/host.jsx')));
+
+  ok('全文件仍然只有总线里那一处 evalScript（没有旁路）',
+    (mainJs.match(/evalScript\(/g) || []).length === 1);
 }
 
 console.log('\n[9b] 安装脚本覆盖旧版 CEP 的调试开关');
@@ -817,7 +853,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 331;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 341;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -863,10 +899,10 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「19 组、1118 项断言」',
-     /19 组、\*\*1118 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1118/1118（不是旧数）',
-     /必须 1118\/1118/.test(report));
+  ok('PLUGIN-REPORT 声明「19 组、1129 项断言」',
+     /19 组、\*\*1129 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1129/1129（不是旧数）',
+     /必须 1129\/1129/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
@@ -879,8 +915,9 @@ console.log('\n[18] 文档测试计数与实测一致');
      /## 1\.7\.9[\s\S]*?1089 项/.test(changelog) &&
      /## 1\.7\.10[\s\S]*?1099 项/.test(changelog) &&
      /## 1\.7\.11[\s\S]*?1102 项/.test(changelog) &&
-     /## 1\.7\.12[\s\S]*?1118 项/.test(changelog));
-  ok('README 写 1118 项', /1118 项/.test(readme));
+     /## 1\.7\.12[\s\S]*?1118 项/.test(changelog) &&
+     /## 1\.7\.13[\s\S]*?1129 项/.test(changelog));
+  ok('README 写 1129 项', /1129 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

@@ -83,6 +83,11 @@ function sysmon_save() {
     var ok = 0, err = '', d = -1, rev = 0;
     var t0 = new Date().getTime();
 
+    var sup = 0;
+    try {
+        if (app && typeof app.beginSuppressDialogs === 'function') { app.beginSuppressDialogs(0); sup = 1; }
+    } catch (e0) { sup = 0; }
+
     try {
         if (!app.project) {
             err = 'no-project';
@@ -105,6 +110,9 @@ function sysmon_save() {
         ok = 0;
         err = String(e && e.message ? e.message : e);
     }
+
+    // 1.7.13：脚本化保存期间别让 AE 再弹它自己的框（缺字体等）
+    if (sup) { try { app.endSuppressDialogs(false); } catch (e2) {} }
 
     return 'ok=' + ok + '&err=' + encodeURIComponent(err) +
            '&d=' + d + '&r=' + rev +

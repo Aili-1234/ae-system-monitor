@@ -233,5 +233,24 @@ ok('内联 JSX 不使用 let/const', !/\b(let|const)\s/.test(inlineJsx));
     decodeURIComponent(String(r2 && r2.err)));
 }
 
+/* ---------- 6. 1.7.13：脚本化保存期间压掉 AE 自己的对话框 ---------- */
+{
+  const box6 = new Function('app', 'encodeURIComponent', hostJsx + '\nreturn { save: sysmon_save };');
+  const calls6 = [];
+  const fakeApp6 = {
+    version: '24.2.1',
+    beginSuppressDialogs: function () { calls6.push('begin'); return true; },
+    endSuppressDialogs: function () { calls6.push('end'); return true; },
+    project: {
+      numItems: 1, file: { fsName: 'Z:\\ro.aep' }, dirty: true, revision: 1, renderQueue: {},
+      save: function () { calls6.push('save'); }
+    }
+  };
+  const api6 = box6(fakeApp6, encodeURIComponent);
+  const r6 = parseKV(api6.save());
+  ok('1.7.13 保存前 beginSuppressDialogs、保存后 endSuppressDialogs（顺序 begin→save→end）',
+    r6 && r6.ok === 1 && calls6.join(',') === 'begin,save,end', calls6.join(','));
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

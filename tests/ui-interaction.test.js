@@ -523,7 +523,7 @@ console.log('\n[新 16] AE 脚本总线：忙与静默窗内必须跳过（不�
 {
   // 把总线那段从 main.js 抠出来真跑（与 [12] / [新 14] 同一手法）
   function busSrc() {
-    const a = mainJs.indexOf('var AE_TX = { busy: false, until: 0 };');
+    const a = mainJs.indexOf('var AE_TX = { busy: false, until: 0, modalHits: 0, paused: false };');
     const b = mainJs.indexOf('// AE 的模态错误翻成人话', a);
     return (a >= 0 && b > a) ? mainJs.slice(a, b) : '';
   }

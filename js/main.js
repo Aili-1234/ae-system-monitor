@@ -548,7 +548,8 @@
      现在所有 evalScript 统一走 aeEval：一次只发一个；忙或处在静默窗时**跳过**
      （心跳跳过没有损失，排队反而会积压出一串迟到脚本）。
      动作类调用后压一段静默窗：保存的进度框、清理的删除过程期间不再插话。 */
-  var AE_TX = { busy: false, until: 0 };
+  var PLUGIN_VER = '1.7.13';   // 面板底部显示；换版本只改这一处（与 VERSION / manifest 同步）
+  var AE_TX = { busy: false, until: 0, modalHits: 0, paused: false };
   var AE_QUIET_SAVE = 1200;    // 保存后静默：app.project.save() 会弹进度框
   var AE_QUIET_PURGE = 1500;   // 清理后静默（清理期间另由 purgeBusy 挡连点）
   var AE_TX_TIMEOUT = 4000;    // 总线兜底：宿主不回话也必须放手
@@ -559,7 +560,42 @@
     if (t > AE_TX.until) AE_TX.until = t;
   }
 
-  function aeFree() { return !!hasCEP && !AE_TX.busy && Date.now() >= AE_TX.until; }
+  function aeFree() {
+    if (!hasCEP || AE_TX.busy) return false;
+    if (AE_TX.paused) return false;                 // 用户还没点「恢复」
+    return Date.now() >= AE_TX.until;
+  }
+
+  /* AE 弹着模态框时（点渲染后的渲染进度条、保存进度、任何对话框），它**拒绝任何脚本**，
+     而且每拒绝一次就弹一次「当模式对话框正在等待回应时，无法运行脚本」。
+     所以撞上就退避：30s → 60s → 120s；第 3 次直接整体暂停，直到用户点「恢复」。
+     退避/暂停期间心跳根本不发 —— 不发就不会弹。 */
+  var AE_MODAL_BASE = 30000;
+  function aeModalBackoff() {
+    AE_TX.modalHits = (AE_TX.modalHits || 0) + 1;
+    if (AE_TX.modalHits >= 3) {                     // 连着撞 3 次 = 大概在长时间渲染
+      AE_TX.paused = true;
+      AE_TX.until = 0;
+      return -1;
+    }
+    var wait = AE_MODAL_BASE * Math.pow(2, AE_TX.modalHits - 1);
+    AE_TX.until = Date.now() + wait;
+    return wait;
+  }
+  function aeModalClear() {
+    if (!AE_TX.modalHits) return;
+    AE_TX.modalHits = 0;
+    AE_TX.until = 0;
+  }
+  function aeIsModal(s) {
+    return /模式对话框|modal dialog|无法运行脚本|while a modal/i.test(String(s == null ? '' : s));
+  }
+  function aeResume() {
+    AE_TX.paused = false;
+    AE_TX.modalHits = 0;
+    AE_TX.until = 0;
+    refresh(false);
+  }
 
   // 发一个脚本；发不出去（无宿主 / 忙 / 静默窗）返回 false 并立刻回调 null
   // timeoutMs：宿主一直不回话时的兜底 —— 到点必须释放 busy，否则总线会被永久占死，
@@ -613,7 +649,13 @@
     function finish(v) { if (!done) { done = true; cb(v); } }
 
     // 走总线：同一时刻只派一个脚本（见上面的 AE 脚本总线）
-    if (!aeEval(jsx, function (res) { finish(parseAE(res)); }, 0, 2500)) finish(null);
+    if (!aeEval(jsx, function (raw) {
+      var row = parseAE(raw);
+      // AE 在模态状态（点渲染之后）里拒绝脚本：退避，别再发了
+      if (!row && aeIsModal(raw)) { aeModalBackoff(); return finish(null); }
+      aeModalClear();
+      finish(row);
+    }, 0, 2500)) finish(null);
     // 渲染中主线程被占死，等 3 秒只是白等：超时改成 1.5 秒，让面板早点收手
     var wait = (ST.proj.rq === 1) ? CFG.aeTimeoutRender : CFG.aeTimeout;
     setTimeout(function () { finish(null); }, wait);
@@ -2392,7 +2434,9 @@
     var R = [];
     if (hasNode) R.push('Node ' + process.versions.node);
     if (ST.demo) R.push('示例数据');
-    $('footRight').textContent = R.join(' · ');
+    $('footRight').textContent = AE_TX.paused
+      ? '监视已暂停（AE 渲染/弹窗中）· 点这里恢复'
+      : R.join(' · ') + (R.length ? ' · ' : '') + 'v' + PLUGIN_VER;
   }
 
   /* 渲染指纹：所有会被画到界面上的数都进这个字符串。
@@ -3672,6 +3716,7 @@
     $('miniCfg').addEventListener('click', openDrawer);
     $('miniPurge').addEventListener('click', requestPurge);
     $('btnPurge').addEventListener('click', requestPurge);
+    $('footRight').addEventListener('click', function () { if (AE_TX.paused) aeResume(); });
     $('dwClose').addEventListener('click', closeDrawer);
     $('mask').addEventListener('click', closeDrawer);
     $('drawer').addEventListener('change', applyDrawer);
