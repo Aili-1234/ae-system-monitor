@@ -123,61 +123,73 @@ function sysmon_save() {
    为什么不在这里删文件：AE 的缓存目录里不只有媒体文件，还有它自己维护的数据库；
    外部删掉文件等于让 AE 的账本对不上，轻则白占空间、重则下次打开报缓存损坏。
    官方入口是菜单「编辑 > 清理 > 全部内存和磁盘缓存」，这里只负责点它。
-   返回 ok=1 表示命令发出去了（AE 的清理本身是异步的，成效要过一会儿再看）。 */
+   返回 ok=1 表示命令发出去了（AE 的清理本身是异步的，成效要过一会儿再看）。
+
+   1.7.14：用户反馈仍然「清理没生效」。上一版只把人话带回来，面板看不见到底是哪条路断的，
+   所以这版把每条路的真实结果都写回去（ver / 有没有 PurgeTarget / 每条菜单名找到的 id /
+   app.purge 的异常原文），面板会写进 saves.log —— 下次不用猜。
+   取序也换了：先试菜单（名字对了就能命中，不依赖 PurgeTarget 枚举是否全局可见），再试 API。 */
 function sysmon_purge() {
     var t0 = new Date().getTime();
-    var ok = 0, id = 0, how = '', err = '', e1 = '', e2 = '';
+    var ok = 0, id = 0, how = '', err = '';
+    var ver = '', hasEnum = 0, tried = [], apiErr = '';
 
-    // 路径一：AE 脚本 API。注意签名是 purge(target)，
-    // target 是 PurgeTarget 枚举——无参调用会抛
-    // "由于调用需要 1 个参数，无法调用 purge"（1.7.10 及以前就是这么错的，用户截图里那条报错）。
-    // 枚举拿不到就不猜数字：给错 target 会清错东西，宁可走菜单。
-    var tgt = null;
+    try { ver = String(app.version || '') } catch (e0) {}
     try {
-        if (typeof PurgeTarget !== 'undefined' && PurgeTarget && PurgeTarget.ALL_CACHES !== undefined) {
-            tgt = PurgeTarget.ALL_CACHES;
-        }
-    } catch (e0) { tgt = null; }
+        if (typeof PurgeTarget !== 'undefined' && PurgeTarget &&
+            PurgeTarget.ALL_CACHES !== undefined) hasEnum = 1;
+    } catch (e1) {}
 
-    if (tgt !== null) {
-        try {
-            app.purge(tgt);
-            ok = 1; how = 'api'; id = -1;
-        } catch (eA) {
-            e1 = String(eA && eA.message ? eA.message : eA);
-        }
-    } else {
-        e1 = '这个版本没有 PurgeTarget 枚举';
-    }
-
-    // 路径二：菜单命令。中文界面的菜单名不只一种写法，多试几个。
-    if (!ok) {
-        var names = [
-            'Purge>All Memory & Disk Cache',
-            'Purge > All Memory & Disk Cache',
-            'Edit>Purge>All Memory & Disk Cache',
-            '编辑>清理>全部内存和磁盘缓存',
-            '清理>全部内存和磁盘缓存'
-        ];
-        var i, mid;
-        for (i = 0; i < names.length && !ok; i++) {
+    /* 路径一：菜单命令。中文界面的菜单名写法不一，几种都试；
+       找到的 id 无论成败都记进 tried，失败时能看出是「名字不对」还是「执行被拒」。 */
+    var names = [
+        'Purge>All Memory & Disk Cache',
+        'Purge > All Memory & Disk Cache',
+        'Edit>Purge>All Memory & Disk Cache',
+        '编辑>清理>全部内存和磁盘缓存',
+        '清理>全部内存和磁盘缓存',
+        'Edit>Purge>All Memory',
+        '编辑>清理>全部内存'
+    ];
+    var i, mid, hit = 0;
+    for (i = 0; i < names.length; i++) {
+        mid = 0;
+        try { mid = app.findMenuCommandId(names[i]) || 0; } catch (e2) { mid = -1; }
+        tried.push(names[i] + '=' + mid);
+        if (mid > 0) {
+            hit = mid;
             try {
-                mid = app.findMenuCommandId(names[i]);
-                if (mid && mid > 0) {
-                    app.executeCommand(mid);
-                    ok = 1; how = 'menu'; id = mid;
-                }
-            } catch (eB) {
-                if (!e2) e2 = String(eB && eB.message ? eB.message : eB);
+                app.executeCommand(mid);
+                ok = 1; how = 'menu'; id = mid;
+            } catch (e3) {
+                apiErr = 'executeCommand(' + mid + ')：' + String(e3 && e3.message ? e3.message : e3);
             }
+            break;
         }
-        if (!ok && !e2) e2 = '菜单里没找到清理命令（试了 5 种写法）';
     }
 
-    // 两条路都没成功时把两边的原因都带回去，下次报错不用猜
-    if (!ok) err = 'purge 接口：' + e1 + '；菜单：' + e2;
+    /* 路径二：AE 脚本 API。签名是 purge(target)，target 是 PurgeTarget 枚举 ——
+       无参调用会抛「由于调用需要 1 个参数，无法调用 purge」（1.7.10 及以前就是这么错的）。
+       枚举拿不到就不猜数字：给错 target 会清错东西。 */
+    if (!ok && hasEnum) {
+        try {
+            app.purge(PurgeTarget.ALL_CACHES);
+            ok = 1; how = 'api'; id = -1;
+        } catch (e4) {
+            if (!apiErr) apiErr = 'app.purge：' + String(e4 && e4.message ? e4.message : e4);
+        }
+    }
+
+    if (!ok) {
+        err = '菜单' + (hit > 0 ? '找到了但执行失败' : '里没有清理命令（试了 ' + names.length + ' 种写法）') +
+              (apiErr ? '；' + apiErr : '') +
+              '；PurgeTarget ' + (hasEnum ? '存在' : '不存在');
+    }
 
     return 'ok=' + ok + '&id=' + id + '&how=' + how +
+           '&ver=' + encodeURIComponent(ver) +
+           '&enum=' + hasEnum +
+           '&tried=' + encodeURIComponent(tried.join('|')) +
            '&err=' + encodeURIComponent(err) +
            '&ms=' + (new Date().getTime() - t0);
 }

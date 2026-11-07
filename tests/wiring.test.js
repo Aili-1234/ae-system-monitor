@@ -537,13 +537,14 @@ console.log('\n[8l] 1.7.12：AE 脚本调用统一走总线 + 清理点下去有
   ok('模态错误翻成人话（保存失败与清理失败两条路都用）',
     /function aeErrText\(s\)/.test(mainJs) &&
     /AE 正在弹窗（进度框或对话框），关掉它再试/.test(mainJs) &&
-    /aeErrText\(ST\.guard\.lastErr\)/.test(mainJs) && /aeErrText\(why\)/.test(mainJs));
+    /aeErrText\(ST\.guard\.lastErr\)/.test(mainJs) &&
+    /aeErrText\(w\.short\)/.test(mainJs));   // 1.7.14：改走 purgeWhy() 的结论
 }
 
 console.log('\n[8m] 1.7.13：点渲染时不再被「模式对话框」弹框轰炸');
 {
   ok('插件版本号在面板底部可见（不用再猜装的是哪一版）',
-    /var PLUGIN_VER = '1\.7\.13';/.test(mainJs) && /'v' \+ PLUGIN_VER/.test(mainJs));
+    /var PLUGIN_VER = '1\.7\.14';/.test(mainJs) && /'v' \+ PLUGIN_VER/.test(mainJs));
 
   ok('撞上模态先退避 30 秒（AE_MODAL_BASE = 30000）',
     /var AE_MODAL_BASE = 30000;/.test(mainJs));
@@ -573,6 +574,28 @@ console.log('\n[8m] 1.7.13：点渲染时不再被「模式对话框」弹框轰
 
   ok('全文件仍然只有总线里那一处 evalScript（没有旁路）',
     (mainJs.match(/evalScript\(/g) || []).length === 1);
+}
+
+console.log('\n[8n] 1.7.14：清理失败不再只给人话 —— 真实原因带回面板并写日志');
+{
+  ok('JSX 把 AE 版本、枚举是否存在、每条菜单试到的 id 一起带回',
+    /&ver=' \+ encodeURIComponent\(ver\)/.test(read('jsx/host.jsx')) &&
+    /&enum=' \+ hasEnum/.test(read('jsx/host.jsx')) &&
+    /&tried=' \+ encodeURIComponent\(tried\.join/.test(read('jsx/host.jsx')));
+
+  ok('取序改成先菜单、后 API（不再依赖 PurgeTarget 是否全局可见）',
+    read('jsx/host.jsx').indexOf("'Purge>All Memory & Disk Cache'") <
+    read('jsx/host.jsx').indexOf('app.purge(PurgeTarget.ALL_CACHES)'));
+
+  ok('失败原因翻成「你现在该做什么」',
+    /function purgeWhy/.test(mainJs) && /这里.*没有清理命令|这版 AE 我不认它的菜单名/.test(mainJs));
+
+  ok('失败时把诊断写进 saves.log（受保存日志开关控制）',
+    /function purgeDiag/.test(mainJs) && /purge fail  how=/.test(mainJs) &&
+    /USR\.crashGuard\.saveLog/.test(mainJs));
+
+  ok('toast 里同时给人话与 AE 原话（用户抓得住可发的证据）',
+    /清理没生效：' \+ aeErrText\(w\.short\) \+ \(w\.raw \? '｜AE 原话：'/.test(mainJs));
 }
 
 console.log('\n[9b] 安装脚本覆盖旧版 CEP 的调试开关');
@@ -853,7 +876,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 341;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 346;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -899,10 +922,10 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「19 组、1129 项断言」',
-     /19 组、\*\*1129 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1129/1129（不是旧数）',
-     /必须 1129\/1129/.test(report));
+  ok('PLUGIN-REPORT 声明「19 组、1139 项断言」',
+     /19 组、\*\*1139 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1139/1139（不是旧数）',
+     /必须 1139\/1139/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
@@ -916,8 +939,9 @@ console.log('\n[18] 文档测试计数与实测一致');
      /## 1\.7\.10[\s\S]*?1099 项/.test(changelog) &&
      /## 1\.7\.11[\s\S]*?1102 项/.test(changelog) &&
      /## 1\.7\.12[\s\S]*?1118 项/.test(changelog) &&
-     /## 1\.7\.13[\s\S]*?1129 项/.test(changelog));
-  ok('README 写 1129 项', /1129 项/.test(readme));
+     /## 1\.7\.13[\s\S]*?1129 项/.test(changelog) &&
+     /## 1\.7\.14[\s\S]*?1139 项/.test(changelog));
+  ok('README 写 1139 项', /1139 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

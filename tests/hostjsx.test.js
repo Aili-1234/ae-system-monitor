@@ -29,7 +29,7 @@ function parseKV(s) {
     if (eq < 0) continue;
     const k = part.slice(0, eq).trim();
     let v = part.slice(eq + 1);
-    if (k === 'p' || k === 'v' || k === 'err') { try { v = decodeURIComponent(v); } catch (e) {} }
+    if (k === 'p' || k === 'v' || k === 'err' || k === 'how' || k === 'tried' || k === 'ver') { try { v = decodeURIComponent(v); } catch (e) {} }
     else v = Number(v);
     o[k] = v;
   }
@@ -227,10 +227,36 @@ ok('内联 JSX 不使用 let/const', !/\b(let|const)\s/.test(inlineJsx));
   const r2 = parseKV(api2.purge());
   ok('没有清理入口时 ok=0 且带原因', r2 && r2.ok === 0 && String(r2.err).length > 0,
     r2 && r2.err);
-  ok('两条路都失败时把两边原因都带回来（下次不用猜）',
-    r2 && /purge \u63a5\u53e3/.test(decodeURIComponent(String(r2.err))) &&
-    /\u83dc\u5355/.test(decodeURIComponent(String(r2.err))),
-    decodeURIComponent(String(r2 && r2.err)));
+  ok('1.7.14 两条路都失败时把两边原因都带回来（含 PurgeTarget 是否存在的结论）',
+    r2 && /PurgeTarget/.test(String(r2.err)) && /菜单/.test(String(r2.err)),
+    String(r2 && r2.err));
+}
+
+/* ---------- 5b. 1.7.14：清理失败时把每条路的真实结果都带回来 ---------- */
+{
+  const boxP = new Function('app', 'encodeURIComponent', hostJsx + '\nreturn { purge: sysmon_purge };');
+  const bare = {
+    version: '24.2.1',
+    findMenuCommandId: function () { return 0; },
+    executeCommand: function () { return false; }
+  };
+  const rP = parseKV(boxP(bare, encodeURIComponent).purge());
+  ok('1.7.14 菜单全落空时 ok=0', rP && rP.ok === 0, JSON.stringify(rP));
+  ok('1.7.14 失败时带回 AE 版本号（面板日志里能直接看到）', rP && /^24\.2\.1$/.test(decodeURIComponent(String(rP.ver || 'NaN'))), rP && rP.ver);
+  ok('1.7.14 失败时带回每条菜单名试过得到的 id（-1=抛错，0=不存在）',
+    rP && typeof rP.tried === 'string' && rP.tried.split('|').length >= 5, rP && rP.tried);
+  ok('1.7.14 失败时说明 PurgeTarget 是否存在',
+    rP && (rP.enum === 0 || rP.enum === 1), rP && rP.enum);
+
+  // 菜单名字对了就命中（即使没有 PurgeTarget 枚举）
+  const callsM = [];
+  const menuOnly = {
+    version: '24.2.1',
+    findMenuCommandId: function (n) { return n === '\u7f16\u8f91>\u6e05\u7406>\u5168\u90e8\u5185\u5b58\u548c\u78c1\u76d8\u7f13\u5b58' ? 8080 : 0; },
+    executeCommand: function (id) { callsM.push(id); return true; }
+  };
+  const rM = parseKV(boxP(menuOnly, encodeURIComponent).purge());
+  ok('1.7.14 没有枚举也能靠中文菜单名成功', rM && rM.ok === 1 && rM.how === 'menu' && callsM[0] === 8080, JSON.stringify(rM));
 }
 
 /* ---------- 6. 1.7.13：脚本化保存期间压掉 AE 自己的对话框 ---------- */
