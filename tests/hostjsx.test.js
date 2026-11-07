@@ -29,7 +29,7 @@ function parseKV(s) {
     if (eq < 0) continue;
     const k = part.slice(0, eq).trim();
     let v = part.slice(eq + 1);
-    if (k === 'p' || k === 'v' || k === 'err' || k === 'how' || k === 'tried' || k === 'ver') { try { v = decodeURIComponent(v); } catch (e) {} }
+    if (k === 'p' || k === 'v' || k === 'err' || k === 'how' || k === 'tried' || k === 'ver' || k === 'apiHow') { try { v = decodeURIComponent(v); } catch (e) {} }
     else v = Number(v);
     o[k] = v;
   }
@@ -191,7 +191,8 @@ ok('内联 JSX 不使用 let/const', !/\b(let|const)\s/.test(inlineJsx));
   const api = box(fakeApp, encodeURIComponent, undefined);
   const r1 = parseKV(api.purge());
   ok('找到清理菜单并执行', r1 && r1.ok === 1 && calls[0] === 4242, JSON.stringify(r1));
-  ok('回报菜单 id（不用猜哪个名字命中了）', r1 && r1.id === 4242, r1 && r1.id);
+  ok('1.7.15 回报走的是哪条路（how=api|menu）',
+    r1 && r1.how === 'menu' && calls[0] === 4242, JSON.stringify(r1));
   ok('耗时是数字毫秒', r1 && typeof r1.ms === 'number' && r1.ms >= 0, r1 && r1.ms);
 
   // 1.7.11：app.purge 必须带 PurgeTarget 参数（无参调用在 AE 24 上直接抛错，
@@ -214,12 +215,13 @@ ok('内联 JSX 不使用 let/const', !/\b(let|const)\s/.test(inlineJsx));
     findMenuCommandId: function (name) {
       return name === '\u7f16\u8f91>\u6e05\u7406>\u5168\u90e8\u5185\u5b58\u548c\u78c1\u76d8\u7f13\u5b58' ? 9090 : 0;
     },
-    executeCommand: function (id) { return true; }
+    executeCommand: function (id) { menuCalls.push(id); return true; }
   };
+  const menuCalls = [];
   const rawMenu = box(throwApp, encodeURIComponent, { ALL_CACHES: 7 }).purge();
   const rMenu = parseKV(rawMenu);
   ok('purge 抛错时回落到菜单命令（中文界面写法）',
-    rMenu && rMenu.ok === 1 && /&how=menu(&|$)/.test(rawMenu) && String(rMenu.id) === '9090',
+    rMenu && rMenu.ok === 1 && /&how=menu(&|$)/.test(rawMenu) && menuCalls[0] === 9090,
     rawMenu);
 
   const bare = { version: '24.2.1' };
@@ -227,8 +229,8 @@ ok('内联 JSX 不使用 let/const', !/\b(let|const)\s/.test(inlineJsx));
   const r2 = parseKV(api2.purge());
   ok('没有清理入口时 ok=0 且带原因', r2 && r2.ok === 0 && String(r2.err).length > 0,
     r2 && r2.err);
-  ok('1.7.14 两条路都失败时把两边原因都带回来（含 PurgeTarget 是否存在的结论）',
-    r2 && /PurgeTarget/.test(String(r2.err)) && /菜单/.test(String(r2.err)),
+  ok('1.7.15 两条路都失败时错误串同时带「purge 接口」与「菜单」两边原因',
+    r2 && /purge 接口：/.test(String(r2.err)) && /菜单：/.test(String(r2.err)),
     String(r2 && r2.err));
 }
 
@@ -243,8 +245,30 @@ ok('内联 JSX 不使用 let/const', !/\b(let|const)\s/.test(inlineJsx));
   const rP = parseKV(boxP(bare, encodeURIComponent).purge());
   ok('1.7.14 菜单全落空时 ok=0', rP && rP.ok === 0, JSON.stringify(rP));
   ok('1.7.14 失败时带回 AE 版本号（面板日志里能直接看到）', rP && /^24\.2\.1$/.test(decodeURIComponent(String(rP.ver || 'NaN'))), rP && rP.ver);
-  ok('1.7.14 失败时带回每条菜单名试过得到的 id（-1=抛错，0=不存在）',
-    rP && typeof rP.tried === 'string' && rP.tried.split('|').length >= 5, rP && rP.tried);
+  ok('1.7.15 失败时说明 API 路是怎么走的（enum/num/none）',
+    rP && typeof rP.apiHow === 'string' && /^(enum|num|none)$/.test(rP.apiHow), rP && rP.apiHow);
+
+  // 1.7.15：没有 PurgeTarget 枚举时，用文档里的数值 1（ALL_CACHES）兜底，并标明用的是数值
+  const numArgs = [];
+  const numApp = {
+    version: '24.2.1',
+    purge: function (t2) { numArgs.push(t2); },
+    findMenuCommandId: function () { return 0; }
+  };
+  const rawNum = boxP(numApp, encodeURIComponent).purge();
+  const rNum = parseKV(rawNum);
+  ok('1.7.15 枚举缺失时用数值 1 走 API 并标 apiHow=num',
+    rNum && rNum.ok === 1 && rNum.apiHow === 'num' && numArgs[0] === 1, rawNum);
+
+  // 1.7.15：disk=1 表示这个 AE 版本的 ALL_CACHES 同时含磁盘缓存（>= 24.3）
+  const newApp = {
+    version: '24.6.0',
+    purge: function () {},
+    findMenuCommandId: function () { return 0; }
+  };
+  const rNew = parseKV(boxP(newApp, encodeURIComponent).purge());
+  ok('1.7.15 AE >= 24.3 时回报 disk=1（这版接口才含磁盘缓存）',
+    rNew && rNew.ok === 1 && rNew.disk === 1, JSON.stringify(rNew));
   ok('1.7.14 失败时说明 PurgeTarget 是否存在',
     rP && (rP.enum === 0 || rP.enum === 1), rP && rP.enum);
 

@@ -516,7 +516,7 @@
       if (eq < 0) continue;
       var k = parts[i].slice(0, eq).trim();
       var v = parts[i].slice(eq + 1);
-      if (k === 'p' || k === 'v' || k === 'err' || k === 'ver' || k === 'tried' || k === 'how') {
+      if (k === 'p' || k === 'v' || k === 'err' || k === 'ver' || k === 'tried' || k === 'how' || k === 'apiHow') {
         try { v = decodeURIComponent(v); } catch (e) {}
       } else {
         v = Number(v);
@@ -548,7 +548,7 @@
      现在所有 evalScript 统一走 aeEval：一次只发一个；忙或处在静默窗时**跳过**
      （心跳跳过没有损失，排队反而会积压出一串迟到脚本）。
      动作类调用后压一段静默窗：保存的进度框、清理的删除过程期间不再插话。 */
-  var PLUGIN_VER = '1.7.14';   // 面板底部显示；换版本只改这一处（与 VERSION / manifest 同步）
+  var PLUGIN_VER = '1.7.15';   // 面板底部显示；换版本只改这一处（与 VERSION / manifest 同步）
   var AE_TX = { busy: false, until: 0, modalHits: 0, paused: false };
   var AE_QUIET_SAVE = 1200;    // 保存后静默：app.project.save() 会弹进度框
   var AE_QUIET_PURGE = 1500;   // 清理后静默（清理期间另由 purgeBusy 挡连点）
@@ -592,38 +592,54 @@
   }
   /* 1.7.14：清理失败不再只给人话 —— 真实原因是上面那段 err，
      有 saveLog 开关时写进日志，用户把日志发我就能定位。 */
+  /* 1.7.15：清理过程的诊断**无条件**写 purge.log（不挂在保存日志开关上 —— 用户要排查时
+     往往没开那个开关，结果什么线索都没有）。 */
   function purgeDiag(r) {
     try {
-      if (!USR || !USR.crashGuard || !USR.crashGuard.saveLog) return;
       if (typeof fs === 'undefined' || !fs || !fs.appendFileSync) return;
       var dir = (typeof localDataDir === 'function') ? localDataDir() : '';
       if (!dir) return;
       try { if (!fs.existsSync(dir)) fs.mkdirSync(dir); } catch (eMk) {}
-      var line = '[' + new Date().toISOString() + '] purge fail  how=' + (r.how || '-') +
-                 '  id=' + (r.id === undefined ? '-' : r.id) +
-                 '  ver=' + (r.ver || '-') + '  enum=' + (r.enum === undefined ? '-' : r.enum) +
-                 '  tried=' + (r.tried || '-') + '  err=' + (r.err || '-') + '\n';
-      fs.appendFileSync(dir + '\\' + 'saves.log', line);
+      var line = '[' + new Date().toISOString() + '] purge ' +
+                 (Number(r && r.ok) === 1 ? 'ok  ' : 'fail') +
+                 '  how=' + ((r && r.how) || '-') +
+                 '  apiHow=' + ((r && r.apiHow) || '-') +
+                 '  ver=' + ((r && r.ver) || '-') +
+                 '  enum=' + (r && r.enum !== undefined ? r.enum : '-') +
+                 '  disk=' + (r && r.disk !== undefined ? r.disk : '-') +
+                 '  err=' + ((r && r.err) || '-') + '\n';
+      fs.appendFileSync(dir + '\\purge.log', line);
     } catch (e) {}
   }
 
-  /* 把 JSX 带回来的失败原因翻成「你现在该做什么」 */
+  /* 把 AE 带回的结果翻成「现在到底发生了什么、你该做什么」 */
   function purgeWhy(r) {
     var raw = (r && r.err) ? String(r.err) : '';
-    if (!raw) return { short: 'AE 没回应（可能正忙）', raw: '' };
-    var tip = '';
-    if (/没有清理命令|里没有清理命令/.test(raw)) {
-      tip = '这版 AE 我不认它的菜单名 —— 先用 AE 菜单「编辑 > 清理 > 全部内存和磁盘缓存」手清一次，并把下面这段发我';
-    } else if (/找到.*执行失败|executeCommand/.test(raw)) {
-      tip = 'AE 找到了清理命令但拒绝执行（可能正在渲染或被其他对话框挡住），关掉它再试';
-    } else if (/PurgeTarget 不存在/.test(raw)) {
-      tip = '这个 AE 版本没有把清理接口暴露给脚本，只能用菜单手动清（本面板不会删你的文件）';
-    } else if (/app\.purge/.test(raw)) {
-      tip = '脚本接口调用失败，可以到 AE 菜单「编辑 > 清理」手动清';
-    } else {
-      tip = '可以到 AE 菜单「编辑 > 清理 > 全部内存和磁盘缓存」手动清，并把下面这段发我';
+    var ver = (r && r.ver) ? String(r.ver) : '';
+    var disk = r && Number(r.disk) === 1;
+    if (Number(r && r.ok) === 1) {
+      return {
+        short: disk
+          ? 'AE 已清理内存与磁盘缓存'
+          : ('AE ' + (ver || '旧版') + ' 的脚本清理只清内存缓存，磁盘缓存它不给脚本接口'),
+        raw: ''
+      };
     }
+    var tip;
+    if (/由于调用需要/.test(raw)) tip = '这个 AE 的清理接口要参数，面板已改用带参调用 —— 重开面板再试';
+    else if (/没有权限|permission|denied/i.test(raw)) tip = 'AE 拒绝了脚本清理（权限/状态），可用菜单手清';
+    else if (raw) tip = 'AE 侧清理失败，可到菜单「编辑 > 清理 > 全部内存和磁盘缓存」手清';
+    else tip = 'AE 没回应（可能正忙或正在渲染）';
     return { short: tip, raw: raw };
+  }
+
+  /* 结果常驻在缓存卡里，不怕 toast 消失 */
+  function showPurgeMsg(text, bad) {
+    var el = $('purgeMsg');
+    if (!el) return;
+    el.hidden = !text;
+    el.textContent = text || '';
+    el.className = bad ? 'hint warn' : 'hint';
   }
 
   function aeResume() {
@@ -783,10 +799,14 @@
       if (!r || Number(r.ok) !== 1) {
         var w = purgeWhy(r);
         purgeDiag(r || {});
-        toast('清理没生效：' + aeErrText(w.short) + (w.raw ? '｜AE 原话：' + w.raw : ''));
+        showPurgeMsg('清理没生效：' + w.short + (w.raw ? '｜AE 原话：' + w.raw : ''), true);
+        toast('清理没生效：' + aeErrText(w.short));
         return;
       }
-      toast('已请 AE 清理磁盘缓存（清理前 ' + fmtBytes(before) + '），正在重新统计…');
+      var wOk = purgeWhy(r);
+      purgeDiag(r);
+      showPurgeMsg('清理完成 · ' + wOk.short + '（清理前 ' + fmtBytes(before) + '）', !Number(r.disk));
+      toast('已请 AE 清理（清理前 ' + fmtBytes(before) + '）· ' + wOk.short + '，正在重新统计…');
       // 清理是异步的：等一拍再重扫，否则读到的还是清理前的数
       setTimeout(function () {
         if (!ST.cache) return;
