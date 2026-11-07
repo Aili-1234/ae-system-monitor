@@ -1,5 +1,28 @@
 # 变更记录
 
+## 1.7.17 —— 撤掉「AE 退出后清理」，改成点一下当场删
+
+**动因**：1.7.16 做的是「登记 → 等 AE 退出 → 清」。用户回了一句干脆的话：
+「不用推出后清理，要么直接清理要么就去掉这个功能」。功能留着，路子换掉。
+
+**删掉的**：`js/purgewatch.js`、抽屉里「AE 退出后清磁盘缓存」那一行与说明、
+`tests/purgewatch.test.js`（31 条）、`PURGE_WATCH_ARM_MS` 等一整套。
+
+**现在的**：点清理 → 先请 AE 清内存缓存（`app.purge`）→ 面板自己递归删缓存桶里的 `*.aecache`。
+
+| 项 | 做法 |
+|---|---|
+| 范围 | 当前缓存桶 + 「其他版本缓存」目录（`ST.other.dirs`） |
+| 只删什么 | `*.aecache`；桶目录本身、`.lst`、工程文件一概不碰 |
+| 删不掉的 | AE 正占用的（EBUSY/EPERM）逐个跳过，计入 `skipped`，不重试不报错 |
+| 结果 | 缓存卡常驻行：「已删磁盘缓存 N 个文件 / X GB（M 个正在用，跳过）」 |
+| 日志 | `%LOCALAPPDATA%\AESystemMonitor\purge.log` 追加 `disk-purge files=N bytes=M skipped=K dirs=D` |
+| 风险 | 个别 AE 版本可能读到一个已删的块；真遇到重启一次 AE（这句也写在结果里） |
+
+**测试**：删 `purgewatch.test.js`（31 条），`wiring` 的 `[8p]` 换成 9 条直接删的断言、另加 `[8q]` 8 条在临时目录上**真删一遍**的断言
+（只认 `.aecache`、`fs.unlinkSync`、跳过被占用、两个目录都扫、结果文案、日志），
+脚本数 8 → 7。合计 **19 组 1169 项**，`tests/` 共 4797 行。
+
 ## 1.7.16 —— AE 退出后清磁盘缓存（A 案引导 + B 案登记）
 
 **动因**：1.7.15 把真因查清了 —— AE 24.3 之前 `PurgeTarget.ALL_CACHES` 只清 RAM 缓存，

@@ -43,7 +43,7 @@
     <div class="card-hd">
       <span>缓存</span>
       <span class="pill" id="cacheVerdict">—</span>
-      <button id="btnPurge" class="ibtn sm" title="请 AE 清理磁盘缓存（走 AE 自己的清理命令，不删文件）"><svg class="g" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.2 3.1h5.6M4.1 3.1V2.1h1.8v1M3 3.1l.35 4.9h3.3L7 3.1"/></svg></button>
+      <button id="btnPurge" class="ibtn sm" title="清空磁盘缓存（删缓存桶里的 .aecache，被 AE 占用的会跳过）"><svg class="g" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.2 3.1h5.6M4.1 3.1V2.1h1.8v1M3 3.1l.35 4.9h3.3L7 3.1"/></svg></button>
       <button class="tg" id="tgCache" aria-expanded="false" title="展开细节"></button>
     </div>
 
@@ -189,7 +189,7 @@
   <!-- 1.7.2b：按钮行留在右栏里（用户：「底下的两个小按钮还是按照之前的来安排」）——
        放在两格下面、跟着右栏居中，而不是独立占一整行。 -->
   <div class="mini-row">
-    <button class="ibtn sm" id="miniPurge" title="请 AE 清理磁盘缓存（走 AE 自己的清理命令，不删文件）"><svg class="g" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.2 3.1h5.6M4.1 3.1V2.1h1.8v1M3 3.1l.35 4.9h3.3L7 3.1"/></svg></button>
+    <button class="ibtn sm" id="miniPurge" title="清空磁盘缓存（删缓存桶里的 .aecache，被 AE 占用的会跳过）"><svg class="g" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.2 3.1h5.6M4.1 3.1V2.1h1.8v1M3 3.1l.35 4.9h3.3L7 3.1"/></svg></button>
     <button class="ibtn sm" id="miniExpand" title="展开面板">↗</button>
     <button class="ibtn sm" id="miniCfg" title="设置">≡</button>
   </div>
@@ -220,13 +220,6 @@
         <input type="checkbox" id="cbPurgeSafe" />
         <label for="cbPurgeSafe">清理缓存要确认（安全模式）</label>
       </div>
-      <!-- 1.7.16：AE 24.3 之前脚本清不掉磁盘缓存，只能等 AE 关掉再动手。
-           登记后由 purgewatch.js 生成的 PowerShell 看门脚本执行：只删 .aecache、进回收站。 -->
-      <div class="row">
-        <label>AE 退出后清磁盘缓存</label>
-        <button class="ibtn sm wide" id="btnPurgeWatch" title="只删缓存桶里的 .aecache，进回收站可撤销；AE 关掉之后才动手">登记</button>
-      </div>
-      <div class="hint" id="purgeWatchHint">—</div>
       <!-- 三个下拉的选项由 js/settings.js 的 MINI_MAIN / MINI_SUB 生成（唯一出处），
            这里留空即可 —— 选项清单不会和 main.js 的取值逻辑各写一份。 -->
       <div class="row">
@@ -421,7 +414,6 @@
 <script src="js/guard.js"></script>
 <script src="js/trend.js"></script>
 <script src="js/backup.js"></script>
-<script src="js/purgewatch.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
