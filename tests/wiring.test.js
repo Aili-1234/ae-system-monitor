@@ -19,9 +19,9 @@ const ok = (n, c, x) => { c ? pass++ : fail++; console.log(`  ${c ? 'PASS' : 'FA
 
 console.log('[1] 脚本引用与加载顺序');
 const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
-ok('引用了 7 个脚本', scripts.length === 7, scripts.join(' -> '));
+ok('引用了 8 个脚本', scripts.length === 8, scripts.join(' -> '));
 ok('每个脚本文件都存在', scripts.every(s => fs.existsSync(path.join(ROOT, s))));
-const order = ['js/ae-cache.js', 'js/settings.js', 'js/reminder.js', 'js/guard.js', 'js/trend.js', 'js/backup.js', 'js/main.js'];
+const order = ['js/ae-cache.js', 'js/settings.js', 'js/reminder.js', 'js/guard.js', 'js/trend.js', 'js/backup.js', 'js/purgewatch.js', 'js/main.js'];
 ok('依赖顺序正确', JSON.stringify(scripts) === JSON.stringify(order), scripts.join(','));
 ok('guard.js 早于 main.js', scripts.indexOf('js/guard.js') < scripts.indexOf('js/main.js'));
 ok('trend.js 早于 main.js', scripts.indexOf('js/trend.js') < scripts.indexOf('js/main.js'));
@@ -643,7 +643,25 @@ console.log('\n[8o] 1.7.15 清理缓存的真因与结果常驻');
   ok('失败原因同时带 purge 接口与菜单两条',
     /purge 接口：/.test(hostPurge) && /菜单：/.test(hostPurge));
   ok('回报 disk（>=24.3 才含磁盘缓存）', /'&disk=' \+ diskCapable/.test(hostPurge));
-  ok('PLUGIN_VER 已是 1.7.15', /var PLUGIN_VER = '1.7.15';/.test(mainJs));
+  ok('PLUGIN_VER 已是 1.7.16', /var PLUGIN_VER = '1.7.16';/.test(mainJs));
+}
+
+console.log('\n[8p] 1.7.16 AE 退出后清磁盘缓存（只删 .aecache、进回收站、可取消）');
+{
+  const htmlAll = read('index.html');
+  ok('抽屉里有登记行与说明', ids.has('btnPurgeWatch') && htmlAll.indexOf('id="purgeWatchHint"') >= 0);
+  ok('purgewatch.js 在 main.js 之前引入',
+    scripts.indexOf('js/purgewatch.js') >= 0 && scripts.indexOf('js/purgewatch.js') < scripts.indexOf('js/main.js'));
+  const pw = read('js/purgewatch.js');
+  ok('脚本只认 *.aecache（不碰工程文件）', /-Filter "\*\.aecache"/.test(pw) && !/\*\.aep\b/.test(pw));
+  ok('进回收站而不是直接删（可撤销）', /SendToRecycleBin/.test(pw) && /FileSystem\]::DeleteFile/.test(pw));
+  ok('等 AE 进程退出才动手', /Get-Process -Name \$names/.test(pw) && /while \(\$true\)/.test(pw));
+  ok('最多等 12 小时，不留常驻僵尸', /MAX_HOURS = 12;/.test(pw) && /AddHours\(' \+ hours \+ '\)/.test(pw) && /timeout waiting for AE exit/.test(pw));
+  ok('取消 = 删 marker，看门进程自己退', /function cancel/.test(pw) && /unlinkSync\(p\.marker\)/.test(pw));
+  ok('登记要两次点击（4 秒窗）', /var PURGE_WATCH_ARM_MS = 4000;/.test(mainJs) && /purgeWatchArming/.test(mainJs));
+  ok('用面板真实扫到的缓存目录登记', /ST\.cache\.path/.test(mainJs) && /ST\.other\.dirs/.test(mainJs));
+  ok('看门进程 detached（面板退出后它继续活）', /detached: true/.test(pw) && /stdio: 'ignore'/.test(pw));
+  ok('24.3 之前的清理结果里指路到登记入口', /设置里登记「AE 退出后清磁盘缓存」/.test(mainJs));
 }
 
 console.log('\n[9b] 安装脚本覆盖旧版 CEP 的调试开关');
@@ -924,7 +942,7 @@ console.log('\n[18] 文档测试计数与实测一致');
    * 本文件自己的断言数只能自指（跑自己会无限递归），所以单独钉 OWN；
    * 其余每个 .test.js 都真跑一遍 —— 文档数字这才第一次真的和**实测**对，
    * 而不是和写在本文件里的另一份手抄数字对。 */
-  const OWN = 358;                     // ← 改本文件断言数时手动 +1/-1
+  const OWN = 369;                     // ← 改本文件断言数时手动 +1/-1
   const cp = require('child_process');
 
   /* ⚠️ 只能扫「逐组表」那一段，不许扫整份报告。
@@ -970,10 +988,10 @@ console.log('\n[18] 文档测试计数与实测一致');
      stated === rowSum && stated === realSum,
      `相加 ${rowSum} / 合计 ${stated} / 实测 ${realSum}`);
 
-  ok('PLUGIN-REPORT 声明「19 组、1153 项断言」',
-     /19 组、\*\*1153 项\*\*断言/.test(report));
-  ok('PLUGIN-REPORT 的门禁写 1153/1153（不是旧数）',
-     /必须 1153\/1153/.test(report));
+  ok('PLUGIN-REPORT 声明「20 组、1195 项断言」',
+     /20 组、\*\*1195 项\*\*断言/.test(report));
+  ok('PLUGIN-REPORT 的门禁写 1195/1195（不是旧数）',
+     /必须 1195\/1195/.test(report));
   ok('CHANGELOG 的 1.6.2 条目保留历史计数 855（历史不改写）',
      /## 1\.6\.2[\s\S]*?18 组 855 项/.test(changelog));
   ok('CHANGELOG 的 1.7.0 条目写 976 项', /## 1\.7\.0[\s\S]*?976 项/.test(changelog));
@@ -988,8 +1006,9 @@ console.log('\n[18] 文档测试计数与实测一致');
      /## 1\.7\.11[\s\S]*?1102 项/.test(changelog) &&
      /## 1\.7\.12[\s\S]*?1118 项/.test(changelog) &&
      /## 1\.7\.13[\s\S]*?1129 项/.test(changelog) &&
-     /## 1\.7\.15[\s\S]*?1153 项/.test(changelog));
-  ok('README 写 1153 项', /1153 项/.test(readme));
+     /## 1\.7\.15[\s\S]*?1153 项/.test(changelog) &&
+     /## 1\.7\.16[\s\S]*?1195 项/.test(changelog));
+  ok('README 写 1195 项', /1195 项/.test(readme));
 
   // 旧数一律不许残留：它们正是这次漂移的化石
   // （写成一条断言而不是逐个数一条 —— 断言总数是文档里被引用的数字，别让它悄悄变）

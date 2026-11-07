@@ -30,6 +30,8 @@
   }
 
   var AE = null;
+  /* 1.7.16：AE 退出后清磁盘缓存 —— 纯逻辑在 js/purgewatch.js，这里只注入 fs / spawn */
+  var PW = (typeof window !== 'undefined' && window.SysmonPurgeWatch) || null;
   if (hasNode && window.AECache) {
     AE = window.AECache.create({ fs: fs, os: os, path: pathmod, Buffer: Buffer_ });
   }
@@ -548,7 +550,7 @@
      现在所有 evalScript 统一走 aeEval：一次只发一个；忙或处在静默窗时**跳过**
      （心跳跳过没有损失，排队反而会积压出一串迟到脚本）。
      动作类调用后压一段静默窗：保存的进度框、清理的删除过程期间不再插话。 */
-  var PLUGIN_VER = '1.7.15';   // 面板底部显示；换版本只改这一处（与 VERSION / manifest 同步）
+  var PLUGIN_VER = '1.7.16';   // 面板底部显示；换版本只改这一处（与 VERSION / manifest 同步）
   var AE_TX = { busy: false, until: 0, modalHits: 0, paused: false };
   var AE_QUIET_SAVE = 1200;    // 保存后静默：app.project.save() 会弹进度框
   var AE_QUIET_PURGE = 1500;   // 清理后静默（清理期间另由 purgeBusy 挡连点）
@@ -640,6 +642,102 @@
     el.hidden = !text;
     el.textContent = text || '';
     el.className = bad ? 'hint warn' : 'hint';
+  }
+
+  /* ---------------- AE 退出后清磁盘缓存（1.7.16 · B 案） ----------------
+     为什么不能点一下当场清：面板跑在 AE 里，缓存桶里的 .aecache 是 AE 正在用的文件；
+     AE 24.3 之前脚本层又没有清磁盘缓存的入口。所以只能「登记 → AE 关掉 → 动手」。
+     登记要两次点击（4 秒窗），登记后随时可取消（删 marker，看门脚本下一轮自己退）。 */
+  var PURGE_WATCH_ARM_MS = 4000;
+  var purgeWatchArming = false, purgeWatchTimer = null;
+
+  function purgeWatchBaseDir() {
+    try { return (typeof localDataDir === 'function') ? localDataDir() : ''; } catch (e) { return ''; }
+  }
+  function purgeWatchPaths() {
+    var b = purgeWatchBaseDir();
+    if (!b || !PW) return null;
+    try { return PW.paths(b); } catch (e) { return null; }
+  }
+  function purgeWatchSpawn() {
+    try { return require('child_process').spawn; } catch (e) { return null; }
+  }
+  function purgeWatchState() {
+    var p = purgeWatchPaths();
+    if (!p || typeof fs === 'undefined' || !fs) return null;
+    try { return PW.state({ fs: fs }, p); } catch (e) { return null; }
+  }
+
+  function renderPurgeWatch() {
+    var btn = $('btnPurgeWatch'), hint = $('purgeWatchHint');
+    if (!btn || !hint) return;
+    var st = purgeWatchState();
+    if (!st) {
+      btn.textContent = '登记';
+      btn.disabled = true;
+      hint.textContent = '这套环境里拿不到文件系统，用不了。';
+      return;
+    }
+    btn.disabled = false;
+    if (purgeWatchArming) { btn.textContent = '再点一次登记'; btn.classList.add('armed'); }
+    else { btn.textContent = st.pending ? '取消' : '登记'; btn.classList.remove('armed'); }
+
+    var txt;
+    if (st.pending) {
+      txt = '已登记：AE 关掉之后把缓存桶里的 .aecache 移进回收站' +
+            (st.files ? '（' + st.files + ' 个文件 / ' + fmtBytes(st.bytes) + '）' : '') +
+            '，最多等 12 小时。';
+    } else if (st.doneFiles !== undefined) {
+      txt = '上次已清 ' + st.doneFiles + ' 个文件 / ' + fmtBytes(st.doneBytes) + '（' + (st.doneAt || '') + '）。要再清一次就重新登记。';
+    } else {
+      txt = '还没登记。登记后 AE 一关，缓存桶里的 .aecache 进回收站 —— 只删这一类文件，桶目录和别的文件都不动。';
+    }
+    hint.textContent = txt;
+  }
+
+  function togglePurgeWatch() {
+    var p = purgeWatchPaths();
+    if (!p || typeof fs === 'undefined' || !fs) { toast('这套环境里用不了'); return; }
+
+    var st = purgeWatchState() || {};
+    if (st.pending) {                                    // 已登记 → 取消
+      PW.cancel({ fs: fs }, p);
+      purgeWatchArming = false;
+      if (purgeWatchTimer) { clearTimeout(purgeWatchTimer); purgeWatchTimer = null; }
+      renderPurgeWatch();
+      toast('已取消：AE 退出后不会清理');
+      return;
+    }
+
+    if (!purgeWatchArming) {                              // 第一次点击 → 进入待确认
+      purgeWatchArming = true;
+      renderPurgeWatch();
+      toast('再点一次「登记」：AE 关闭后清一次磁盘缓存（进回收站，可撤销）');
+      purgeWatchTimer = setTimeout(function () {
+        purgeWatchArming = false; purgeWatchTimer = null; renderPurgeWatch();
+      }, PURGE_WATCH_ARM_MS);
+      return;
+    }
+
+    purgeWatchArming = false;                             // 第二次点击 → 真登记
+    if (purgeWatchTimer) { clearTimeout(purgeWatchTimer); purgeWatchTimer = null; }
+
+    var dirs = [];
+    if (ST.cache && ST.cache.path) dirs.push(ST.cache.path);
+    if (ST.other && ST.other.dirs && ST.other.dirs.length) dirs = dirs.concat(ST.other.dirs);
+    if (!dirs.length) { renderPurgeWatch(); toast('还没扫到缓存目录，先点一次刷新'); return; }
+
+    var files = (ST.cache && ST.cache.files) || 0;
+    var bytes = (ST.cache && ST.cache.used) || 0;
+    var reg = PW.register({ fs: fs }, {
+      baseDir: purgeWatchBaseDir(), dirs: dirs, files: files, bytes: bytes, ver: PLUGIN_VER
+    });
+    if (!reg.ok) { renderPurgeWatch(); toast('登记失败：' + (reg.err || '写不了文件')); return; }
+
+    var sp = PW.launch({ spawn: purgeWatchSpawn() }, { ps1: reg.ps1 });
+    renderPurgeWatch();
+    if (!sp.ok) { toast('脚本写好了，但看门进程没起来：' + (sp.err || '拿不到 spawn') + '（重启 AE 后再试）'); return; }
+    toast('已登记：AE 关掉之后清 ' + (files ? files + ' 个文件 / ' : '') + fmtBytes(bytes) + '（进回收站，可撤销）');
   }
 
   function aeResume() {
@@ -805,7 +903,10 @@
       }
       var wOk = purgeWhy(r);
       purgeDiag(r);
-      showPurgeMsg('清理完成 · ' + wOk.short + '（清理前 ' + fmtBytes(before) + '）', !Number(r.disk));
+      var onlyRam = !Number(r.disk);
+      showPurgeMsg('清理完成 · ' + wOk.short + '（清理前 ' + fmtBytes(before) + '）' +
+        (onlyRam ? '。磁盘缓存要真清掉：设置里登记「AE 退出后清磁盘缓存」，或用 AE 菜单「编辑 > 清理 > 全部内存和磁盘缓存」' : ''),
+        onlyRam);
       toast('已请 AE 清理（清理前 ' + fmtBytes(before) + '）· ' + wOk.short + '，正在重新统计…');
       // 清理是异步的：等一拍再重扫，否则读到的还是清理前的数
       setTimeout(function () {
@@ -3183,6 +3284,7 @@
   /* 提醒输入框 → 开关控件的对应表（preview 用） */
 
   function syncDrawer() {
+    renderPurgeWatch();
     if (!USR) return;
     $('cbAuto').checked = !!USR.autoCollapse;
     if ($('cbPurgeSafe')) $('cbPurgeSafe').checked = !!(USR.ui && USR.ui.purgeConfirm);
@@ -3773,6 +3875,7 @@
     $('miniCfg').addEventListener('click', openDrawer);
     $('miniPurge').addEventListener('click', requestPurge);
     $('btnPurge').addEventListener('click', requestPurge);
+    if ($('btnPurgeWatch')) $('btnPurgeWatch').addEventListener('click', togglePurgeWatch);
     $('footRight').addEventListener('click', function () { if (AE_TX.paused) aeResume(); });
     $('dwClose').addEventListener('click', closeDrawer);
     $('mask').addEventListener('click', closeDrawer);

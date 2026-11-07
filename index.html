@@ -220,6 +220,13 @@
         <input type="checkbox" id="cbPurgeSafe" />
         <label for="cbPurgeSafe">清理缓存要确认（安全模式）</label>
       </div>
+      <!-- 1.7.16：AE 24.3 之前脚本清不掉磁盘缓存，只能等 AE 关掉再动手。
+           登记后由 purgewatch.js 生成的 PowerShell 看门脚本执行：只删 .aecache、进回收站。 -->
+      <div class="row">
+        <label>AE 退出后清磁盘缓存</label>
+        <button class="ibtn sm wide" id="btnPurgeWatch" title="只删缓存桶里的 .aecache，进回收站可撤销；AE 关掉之后才动手">登记</button>
+      </div>
+      <div class="hint" id="purgeWatchHint">—</div>
       <!-- 三个下拉的选项由 js/settings.js 的 MINI_MAIN / MINI_SUB 生成（唯一出处），
            这里留空即可 —— 选项清单不会和 main.js 的取值逻辑各写一份。 -->
       <div class="row">
@@ -414,6 +421,7 @@
 <script src="js/guard.js"></script>
 <script src="js/trend.js"></script>
 <script src="js/backup.js"></script>
+<script src="js/purgewatch.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
